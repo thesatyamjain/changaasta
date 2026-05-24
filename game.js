@@ -164,14 +164,13 @@ const GameEngine = {
     // Right column: top-to-bottom
     for (let r = r1; r <= r2 - 1; r++) coords.push({ r, c: c2 });
     
-    // Even rings are standard loop, odd rings are reversed
-    if (ringIndex % 2 === 1) {
+    // Alternating spiral directions:
+    // Outer Ring (index 0) Anti-clockwise, Inner Ring (index 1) Clockwise
+    if (ringIndex % 2 === 0) {
       coords.reverse();
-      // Adjust standard rotation after reversing to keep it continuous
       const last = coords.pop();
       coords.unshift(last);
     }
-    
     return coords;
   },
 
@@ -339,6 +338,18 @@ const GameState = {
     this.gamePhase = 'rolling';
     this.addLog('System', `Khel ${size}x${size} board par shuru ho gaya hai!`);
     this.addLog('System', `Ab ${this.getCurrentPlayer().name} ki baari hai.`);
+    
+    // Set initial shell visibility based on board size
+    const cowrieCount = size === 5 ? 4 : 6;
+    const shells = document.querySelectorAll('.cowrie-shell');
+    shells.forEach((s, idx) => {
+      if (idx < cowrieCount) {
+        s.style.display = 'block';
+        s.className = 'cowrie-shell mouth-up';
+      } else {
+        s.style.display = 'none';
+      }
+    });
   },
 
   getCurrentPlayer() {
@@ -390,7 +401,13 @@ const GameState = {
       // Render shell visuals
       shells.forEach((s, idx) => {
         if (idx < cowrieCount) {
-          s.className = `cowrie-shell ${shellStates[idx] ? 'mouth-up' : 'mouth-down'}`;
+          const isUp = shellStates[idx];
+          s.className = `cowrie-shell ${isUp ? 'mouth-up' : 'mouth-down'}`;
+          
+          // Apply a random rotation to make the scattered shells look realistic
+          const randomRot = Math.floor(Math.random() * 80) - 40; // -40 to 40 degrees
+          s.style.setProperty('--rand-rot', `${randomRot}deg`);
+          
           s.style.display = 'block';
         } else {
           s.style.display = 'none';
@@ -403,13 +420,13 @@ const GameState = {
 
       if (this.gridSize === 5) {
         // 5x5: 4 shells
-        if (mouthsUp === 0) { rollValue = 8; extraRoll = true; }
-        else if (mouthsUp === 4) { rollValue = 4; extraRoll = true; }
+        if (mouthsUp === 0) { rollValue = 4; extraRoll = true; }
+        else if (mouthsUp === 4) { rollValue = 8; extraRoll = true; }
         else { rollValue = mouthsUp; }
       } else {
         // 7x7: 6 shells
-        if (mouthsUp === 0) { rollValue = 12; extraRoll = true; }
-        else if (mouthsUp === 6) { rollValue = 6; extraRoll = true; }
+        if (mouthsUp === 0) { rollValue = 6; extraRoll = true; }
+        else if (mouthsUp === 6) { rollValue = 12; extraRoll = true; }
         else { rollValue = mouthsUp; }
       }
 
@@ -521,23 +538,25 @@ const GameState = {
 
     const player = this.getCurrentPlayer();
     const path = this.paths[pawn.color];
-    const nextIndex = pawn.pathIndex + value;
+    const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+    let nextIndex = pawn.pathIndex + value;
 
     // Past center goal check
-    if (nextIndex >= path.length) return false;
-
-    // Entry to inner loops requires at least one cut (capture)
-    const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
-    if (pawn.pathIndex < firstInnerIndex && nextIndex >= firstInnerIndex) {
-      if (!player.hasKilled) return false;
-    }
+    if (player.hasKilled && nextIndex >= path.length) return false;
 
     // Gatti pairing blockade checks
     if (this.rules.gattiEnabled) {
       // Check intermediate path blocks
-      for (let idx = pawn.pathIndex + 1; idx <= nextIndex; idx++) {
+      for (let step = 1; step <= value; step++) {
+        let idx = pawn.pathIndex + step;
+        
+        // Wrap around logic if haven't killed
+        if (!player.hasKilled && idx >= firstInnerIndex) {
+          idx = idx % firstInnerIndex;
+        }
+
         const cell = path[idx];
-        const isLast = idx === nextIndex;
+        const isLast = step === value;
         
         // Find if there is an opponent Gatti on this cell
         const gattiPawn = this.getOpponentGattiOnCell(cell.r, cell.c, pawn.color);
@@ -581,23 +600,8 @@ const GameState = {
 
     if (!this.isValidPawnMove(pawn, value)) return;
 
-    // Highlight target cell
-    document.querySelectorAll('.cell').forEach(c => c.classList.remove('valid-target'));
-    
-    let targetCell;
-    if (pawn.pathIndex === -1) {
-      // Spawn at index 0
-      targetCell = this.paths[pawn.color][0];
-    } else {
-      const targetIdx = pawn.pathIndex + value;
-      targetCell = this.paths[pawn.color][targetIdx];
-    }
-
-    const cellEl = document.querySelector(`.cell[data-r="${targetCell.r}"][data-c="${targetCell.c}"]`);
-    if (cellEl) {
-      cellEl.classList.add('valid-target');
-      cellEl.onclick = () => this.executeMove(pawn, value);
-    }
+    // Execute move immediately upon pawn selection
+    this.executeMove(pawn, value);
   },
 
   executeMove(pawn, value) {
@@ -612,6 +616,25 @@ const GameState = {
 
     let originalPathIndex = pawn.pathIndex;
     let nextIndex = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + value;
+    const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+    
+    if (pawn.pathIndex !== -1 && !player.hasKilled && nextIndex >= firstInnerIndex) {
+      nextIndex = nextIndex % firstInnerIndex;
+    }
+    // Store old DOM rects for WAAPI animation
+    this.animatingPawns = [];
+    const movingPawns = pawn.isGatti ? player.pawns.filter(p => p.isGatti && p.pathIndex === originalPathIndex) : [pawn];
+    
+    movingPawns.forEach(p => {
+      const pEl = document.querySelector(`.pawn[data-player-index="${this.currentPlayerIndex}"][data-pawn-id="${p.id}"]`);
+      if (pEl) {
+        this.animatingPawns.push({
+          playerIdx: this.currentPlayerIndex,
+          pawnId: p.id,
+          oldRect: pEl.getBoundingClientRect()
+        });
+      }
+    });
     
     // Handle Pawn movement
     pawn.pathIndex = nextIndex;
@@ -705,6 +728,7 @@ const GameState = {
       this.addLog('System', `${player.name} ko ek aur mauka mila!`);
       
       this.renderBoard();
+      this.triggerMoveAnimations();
       
       if (player.isBot) {
         setTimeout(() => this.rollCowries(), 1200);
@@ -713,6 +737,7 @@ const GameState = {
     }
 
     this.renderBoard();
+    this.triggerMoveAnimations();
 
     // Check next phase
     if (this.rollQueue.length > 0) {
@@ -754,21 +779,49 @@ const GameState = {
   },
 
   triggerVictory(player) {
-    synth.playWin();
-    this.gamePhase = 'ended';
-    this.winner = player.color;
+    this.gamePhase = 'gameover';
+    this.winner = player;
+    this.addLog('System', `🏆 ${player.name} jeet gaya!`);
     
-    // Render victory modal
-    const overlay = document.getElementById('victory-overlay');
-    const banner = document.getElementById('victory-banner');
+    synth.playVictory();
     
-    if (overlay && banner) {
-      banner.className = `winner-banner ${player.color}`;
-      banner.innerText = `${player.name} (${player.color.toUpperCase()}) Jeet Gaya!`;
-      overlay.classList.remove('hidden');
-    }
+    setTimeout(() => {
+      document.getElementById('victory-overlay').classList.remove('hidden');
+      const banner = document.getElementById('victory-banner');
+      if (banner) {
+        banner.innerText = `${player.name} Jeet Gaya!`;
+        banner.style.color = `var(--color-${player.color})`;
+      }
+    }, 1000);
+  },
+
+  // Apply FLIP animations to pawns that just moved
+  triggerMoveAnimations() {
+    if (!this.animatingPawns || this.animatingPawns.length === 0) return;
     
-    this.addLog('System', `Badhai ho! ${player.name} khel jeet gaya.`);
+    requestAnimationFrame(() => {
+      this.animatingPawns.forEach(anim => {
+        const newEl = document.querySelector(`.pawn[data-player-index="${anim.playerIdx}"][data-pawn-id="${anim.pawnId}"]`);
+        if (newEl && anim.oldRect) {
+          const newRect = newEl.getBoundingClientRect();
+          const dx = anim.oldRect.left - newRect.left;
+          const dy = anim.oldRect.top - newRect.top;
+          
+          if (dx !== 0 || dy !== 0) {
+            if (typeof newEl.animate === 'function') {
+              newEl.animate([
+                { transform: `translate(${dx}px, ${dy}px) scale(1.3)` },
+                { transform: 'translate(0, 0) scale(1)' }
+              ], {
+                duration: 400,
+                easing: 'cubic-bezier(0.25, 1, 0.5, 1)'
+              });
+            }
+          }
+        }
+      });
+      this.animatingPawns = [];
+    });
   },
 
   // Trigger capture ripple particle animation
@@ -826,7 +879,13 @@ const GameState = {
       
       let score = 0;
       const currentIdx = pawn.pathIndex;
-      const nextIdx = currentIdx === -1 ? 0 : currentIdx + value;
+      let nextIdx = currentIdx === -1 ? 0 : currentIdx + value;
+      const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+      
+      if (currentIdx !== -1 && !player.hasKilled && nextIdx >= firstInnerIndex) {
+        nextIdx = nextIdx % firstInnerIndex;
+      }
+      
       const targetCell = this.paths[pawn.color][nextIdx];
       const isTargetSafe = GameEngine.isSafeCell(this.gridSize, targetCell.r, targetCell.c);
       
@@ -948,6 +1007,18 @@ const GameState = {
           else if (r === centerIdx && c === this.gridSize) cell.classList.add('player-home-blue');
         }
 
+        // Add entry mark indicator
+        const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+        this.players.forEach(p => {
+          const path = this.paths[p.color];
+          if (path && path.length > firstInnerIndex) {
+            const entryCell = path[firstInnerIndex - 1]; // Cell before moving inward
+            if (entryCell.r === r && entryCell.c === c) {
+              cell.classList.add(`entry-mark-${p.color}`);
+            }
+          }
+        });
+
         // Draw Pawns in this Cell
         const pawnsInCell = [];
         
@@ -1020,7 +1091,34 @@ const GameState = {
     inner.className = 'pawn-inner';
     pEl.appendChild(inner);
 
+    pEl.onmouseenter = () => {
+      if (this.gamePhase !== 'moving' || playerIdx !== this.currentPlayerIndex || this.getCurrentPlayer().isBot) return;
+      if (this.selectedRollIndex === null) return;
+      const value = this.rollQueue[this.selectedRollIndex];
+      if (!this.isValidPawnMove(pawn, value)) return;
+
+      let targetCell;
+      if (pawn.pathIndex === -1) {
+        targetCell = this.paths[pawn.color][0];
+      } else {
+        let targetIdx = pawn.pathIndex + value;
+        const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+        if (!this.getCurrentPlayer().hasKilled && targetIdx >= firstInnerIndex) {
+          targetIdx = targetIdx % firstInnerIndex;
+        }
+        targetCell = this.paths[pawn.color][targetIdx];
+      }
+      
+      const cellEl = document.querySelector(`.cell[data-r="${targetCell.r}"][data-c="${targetCell.c}"]`);
+      if (cellEl) cellEl.classList.add('valid-target');
+    };
+
+    pEl.onmouseleave = () => {
+      document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
+    };
+
     pEl.onclick = (e) => {
+      document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
       if (pEl.parentElement && pEl.parentElement.classList.contains('valid-target')) return;
       e.stopPropagation();
       this.selectPawn(playerIdx, pawn.id);
@@ -1038,7 +1136,13 @@ const GameState = {
       yardEl.innerHTML = '';
 
       const playerIdx = this.players.findIndex(p => p.color === col);
-      if (playerIdx === -1) return;
+      if (playerIdx === -1) {
+        // Hide unused yards visually
+        yardEl.style.display = 'none';
+        return;
+      } else {
+        yardEl.style.display = 'flex';
+      }
 
       const player = this.players[playerIdx];
       player.pawns.forEach(pawn => {
@@ -1071,9 +1175,85 @@ window.restartGame = function() {
   document.getElementById('setup-screen').classList.remove('hidden');
 };
 
+window.selectPlayerType = function(color, type) {
+  if (window.synth && typeof window.synth.playToggle === 'function') {
+    window.synth.playToggle();
+  }
+  
+  // Update hidden input
+  document.getElementById(`type-${color}`).value = type;
+  
+  // Update active state of segmented buttons
+  const container = document.getElementById(`seg-${color}`);
+  if (container) {
+    container.querySelectorAll('.seg-btn').forEach(btn => btn.classList.remove('active'));
+    container.querySelector(`.seg-btn[data-val="${type}"]`).classList.add('active');
+  }
+};
+
+window.selectPlayerCount = function(count) {
+  if (window.synth && typeof window.synth.playToggle === 'function') {
+    window.synth.playToggle();
+  }
+  
+  document.getElementById('select-count').value = count;
+  
+  // Update UI toggles
+  const container = document.getElementById('toggle-count-container');
+  if (container) {
+    container.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+    container.querySelector(`.btn-toggle[data-val="${count}"]`).classList.add('active');
+  }
+
+  // Show/Hide player setup cards
+  const allCards = document.querySelectorAll('.player-setup-card');
+  const cardRed = document.querySelector('.card-red');
+  const cardYellow = document.querySelector('.card-yellow');
+  const cardGreen = document.querySelector('.card-green');
+  const cardBlue = document.querySelector('.card-blue');
+
+  allCards.forEach(c => c.style.display = 'none');
+
+  if (count === 2) {
+    if (cardRed) cardRed.style.display = 'flex';
+    if (cardYellow) cardYellow.style.display = 'flex';
+  } else if (count === 3) {
+    if (cardRed) cardRed.style.display = 'flex';
+    if (cardGreen) cardGreen.style.display = 'flex';
+    if (cardYellow) cardYellow.style.display = 'flex';
+  } else {
+    allCards.forEach(c => c.style.display = 'flex');
+  }
+};
+
+window.selectGameMode = function(mode) {
+  if (window.synth && typeof window.synth.playToggle === 'function') {
+    window.synth.playToggle();
+  }
+  
+  document.getElementById('select-mode').value = mode;
+  
+  // Update UI toggles
+  const container = document.getElementById('toggle-mode-container');
+  if (container) {
+    container.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+    container.querySelector(`.btn-toggle[data-val="${mode}"]`).classList.add('active');
+  }
+
+  // Show/Hide the individual player bot toggles
+  const wrappers = document.querySelectorAll('.bot-toggle-wrapper');
+  if (mode === 'bot') {
+    wrappers.forEach(w => w.style.display = 'flex');
+  } else {
+    wrappers.forEach(w => w.style.display = 'none');
+  }
+};
+
 window.startGame = function() {
   // Capture inputs
   const size = parseInt(document.getElementById('select-size').getAttribute('data-value') || '5');
+  const count = parseInt(document.getElementById('select-count').value || '4');
+  const mode = document.getElementById('select-mode').value || 'local';
   
   const rules = {
     gattiEnabled: document.getElementById('rule-gatti').classList.contains('active'),
@@ -1081,16 +1261,22 @@ window.startGame = function() {
   };
 
   const playersList = [];
-  const colors = ['red', 'green', 'yellow', 'blue'];
   
-  colors.forEach(col => {
+  let colorsToUse = ['red', 'green', 'yellow', 'blue'];
+  if (count === 2) {
+    colorsToUse = ['red', 'yellow'];
+  } else if (count === 3) {
+    colorsToUse = ['red', 'green', 'yellow'];
+  }
+  
+  colorsToUse.forEach(col => {
     const input = document.getElementById(`name-${col}`);
     const botSelect = document.getElementById(`type-${col}`);
     if (input) {
       playersList.push({
         name: input.value.trim() || `${col.toUpperCase()} Player`,
         color: col,
-        isBot: botSelect.value === 'bot'
+        isBot: (mode === 'local') ? false : (botSelect.value === 'bot')
       });
     }
   });
@@ -1112,16 +1298,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggles = document.querySelectorAll('.btn-toggle');
   toggles.forEach(btn => {
     btn.addEventListener('click', () => {
-      synth.playToggle();
-      
       // If it's board size toggle, handle exclusive active
       if (btn.parentNode.id === 'toggle-size-container') {
+        synth.playToggle();
         btn.parentNode.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('select-size').setAttribute('data-value', btn.getAttribute('data-val'));
-      } else {
+      } 
+      // If it's a generic rule toggle (Niyam Chunein)
+      else if (btn.parentNode.id !== 'toggle-mode-container' && btn.parentNode.id !== 'toggle-count-container') {
+        synth.playToggle();
         btn.classList.toggle('active');
       }
+      // Note: toggle-mode-container and toggle-count-container have their own onclick handlers in HTML
+      // which already play the sound and manage the active state.
     });
   });
 });
