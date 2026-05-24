@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Changa Asta - Chalkboard Edition</title>
+  <meta name="description" content="Play the premium chalkboard edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara).">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>CHANGA ASTA</h1>
+      <p>The Ancient Game of Strategy & Probability</p>
+    </header>
+
+    <!-- SETUP / LOBBY SCREEN -->
+    <div id="setup-screen" class="glass-panel">
+      <h2 class="setup-title">Khel Ki Settings</h2>
+
+      <!-- Board Size Settings -->
+      <div class="settings-group">
+        <span class="settings-label">Board Chunein:</span>
+        <div class="toggle-options" id="toggle-size-container">
+          <button class="btn-toggle active" data-val="5">5x5 Grid (4 Cowries)</button>
+          <button class="btn-toggle" data-val="7">7x7 Grid (6 Cowries)</button>
+        </div>
+        <input type="hidden" id="select-size" data-value="5">
+      </div>
+
+      <!-- Advanced Rules Toggles -->
+      <div class="settings-group">
+        <span class="settings-label">Niyam Chunein:</span>
+        <div class="toggle-options">
+          <button class="btn-toggle active" id="rule-gatti">Gatti Banana (Blockades)</button>
+          <button class="btn-toggle active" id="rule-spawn">Ghar Se Nikalna (4/8/6/12 Par)</button>
+        </div>
+      </div>
+
+      <!-- Player Customization List -->
+      <div class="settings-group">
+        <span class="settings-label">Khiladi Chunein:</span>
+        <div class="player-setup-list">
+          <!-- South (Red) -->
+          <div class="player-setup-card">
+            <span class="color-indicator red"></span>
+            <input type="text" id="name-red" value="Neeche Wala (Red)" placeholder="Red Name">
+            <select id="type-red">
+              <option value="human">Insaan</option>
+              <option value="bot">Computer</option>
+            </select>
+          </div>
+
+          <!-- West (Green) -->
+          <div class="player-setup-card">
+            <span class="color-indicator green"></span>
+            <input type="text" id="name-green" value="Baayein Wala (Green)" placeholder="Green Name">
+            <select id="type-green">
+              <option value="human">Insaan</option>
+              <option value="bot" selected>Computer</option>
+            </select>
+          </div>
+
+          <!-- North (Yellow) -->
+          <div class="player-setup-card">
+            <span class="color-indicator yellow"></span>
+            <input type="text" id="name-yellow" value="Upar Wala (Yellow)" placeholder="Yellow Name">
+            <select id="type-yellow">
+              <option value="human">Insaan</option>
+              <option value="bot" selected>Computer</option>
+            </select>
+          </div>
+
+          <!-- East (Blue) -->
+          <div class="player-setup-card">
+            <span class="color-indicator blue"></span>
+            <input type="text" id="name-blue" value="Daayein Wala (Blue)" placeholder="Blue Name">
+            <select id="type-blue">
+              <option value="human">Insaan</option>
+              <option value="bot" selected>Computer</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="startGame()">KHEL SHURU KAREIN</button>
+    </div>
+
+    <!-- MAIN GAMEPLAY SCREEN -->
+    <div id="game-screen" class="hidden">
+      
+      <!-- Board Area with Chalk Pockets -->
+      <div class="board-outer-container">
+        <div class="board-wrapper">
+          <!-- Yards as chalk ovals -->
+          <div class="yard-pocket top" id="yard-yellow" title="North Yard"></div>
+          <div class="yard-pocket left" id="yard-green" title="West Yard"></div>
+          <div class="yard-pocket right" id="yard-blue" title="East Yard"></div>
+          <div class="yard-pocket bottom" id="yard-red" title="South Yard"></div>
+          
+          <div class="board-frame">
+            <div id="board" class="board-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Stats Sidebar -->
+      <div class="sidebar">
+        
+        <!-- Current Turn Display -->
+        <div class="player-turn-indicator glass-panel">
+          <div class="status-avatar" id="turn-avatar">●</div>
+          <div class="turn-name-container">
+            <span class="player-tag" id="turn-name">---</span>
+            <span class="phase-tag" id="turn-phase">---</span>
+          </div>
+        </div>
+
+        <!-- Rolling Panel -->
+        <div class="roll-panel glass-panel">
+          <!-- 3D Cowrie Shell Elements -->
+          <div class="shells-container">
+            <div class="cowrie-shell" id="shell-0"><div class="slit"></div><div class="back-ridges"></div></div>
+            <div class="cowrie-shell" id="shell-1"><div class="slit"></div><div class="back-ridges"></div></div>
+            <div class="cowrie-shell" id="shell-2"><div class="slit"></div><div class="back-ridges"></div></div>
+            <div class="cowrie-shell" id="shell-3"><div class="slit"></div><div class="back-ridges"></div></div>
+            <div class="cowrie-shell" id="shell-4"><div class="slit"></div><div class="back-ridges"></div></div>
+            <div class="cowrie-shell" id="shell-5"><div class="slit"></div><div class="back-ridges"></div></div>
+          </div>
+
+          <button id="btn-roll" class="btn-primary" style="width: 100%;" onclick="rollDice()">KOUDI FEKEIN</button>
+          
+          <!-- Remaining Move values to apply -->
+          <div id="roll-queue" class="queue-panel"></div>
+        </div>
+
+        <!-- Logging Console -->
+        <div class="log-panel glass-panel">
+          <div class="log-title">Khel Ka Vivaran</div>
+          <div class="log-content" id="log-box"></div>
+        </div>
+
+        <!-- Utilities -->
+        <div class="utility-controls glass-panel">
+          <button class="btn-icon" id="btn-mute" onclick="toggleMute()" title="Mute Audio">
+            <span id="volume-icon">🔊</span>
+          </button>
+          <button class="btn-primary" style="font-size: 0.85rem; padding: 8px 15px;" onclick="restartGame()">Naya Khel</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- VICTORY OVERLAY SCREEN -->
+    <div id="victory-overlay" class="hidden">
+      <div class="victory-card glass-panel">
+        <h2 class="victory-title">JEET!</h2>
+        <div id="victory-banner" class="winner-banner">Khiladi Jeet Gaya!</div>
+        <p style="color: var(--text-muted);">Sabhi 4 gotiyan center (Ghar) pahunch gayi!</p>
+        <button class="btn-primary" onclick="restartGame()" style="margin-top: 15px;">FIR SE KHELEIN</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
