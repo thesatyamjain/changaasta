@@ -274,17 +274,17 @@ header p {
 }
 
 .board-grid.size-5 {
-  grid-template-columns: repeat(5, minmax(75px, 85px));
-  grid-template-rows: repeat(5, minmax(75px, 85px));
-  width: min(425px, 80vw);
-  height: min(425px, 80vw);
+  grid-template-columns: repeat(5, 85px);
+  grid-template-rows: repeat(5, 85px);
+  width: 425px;
+  height: 425px;
 }
 
 .board-grid.size-7 {
-  grid-template-columns: repeat(7, minmax(55px, 65px));
-  grid-template-rows: repeat(7, minmax(55px, 65px));
-  width: min(455px, 85vw);
-  height: min(455px, 85vw);
+  grid-template-columns: repeat(7, 65px);
+  grid-template-rows: repeat(7, 65px);
+  width: 455px;
+  height: 455px;
 }
 
 /* Grid Cells (Chalk-drawn borders) */
@@ -601,6 +601,10 @@ header p {
   backface-visibility: hidden;
 }
 
+.cowrie-shell.mouth-down .slit {
+  display: none;
+}
+
 .cowrie-shell .back-ridges {
   position: absolute;
   width: 100%;
@@ -804,11 +808,18 @@ header p {
   }
   
   .board-outer-container {
-    padding: 70px; /* Slimmer padding for mobile */
+    padding: 70px;
   }
   
   .sidebar {
     width: 100%;
     max-width: 450px;
+  }
+}
+
+@media (max-width: 750px) {
+  .board-outer-container {
+    padding: 100px 50px;
+    /* JS will dynamically handle the transform scaling */
   }
 }

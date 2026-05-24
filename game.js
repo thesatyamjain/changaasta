@@ -255,6 +255,28 @@ const GameEngine = {
   }
 };
 
+function adjustBoardScale() {
+  const container = document.querySelector('.board-outer-container');
+  if (!container) return;
+  
+  // Calculate maximum available width based on viewport
+  const maxWidth = Math.min(window.innerWidth - 20, 750);
+  const scale = maxWidth / 750;
+  
+  if (scale < 1) {
+    container.style.transform = `scale(${scale})`;
+    container.style.transformOrigin = 'top center';
+    // Offset the lost height to prevent large empty space below the board
+    const lostHeight = 750 * (1 - scale);
+    container.style.marginBottom = `-${lostHeight}px`;
+  } else {
+    container.style.transform = 'none';
+    container.style.marginBottom = '0px';
+  }
+}
+
+window.addEventListener('resize', adjustBoardScale);
+
 // Main Game State Object
 const GameState = {
   gridSize: 5,
@@ -944,6 +966,11 @@ const GameState = {
 
     // Render starting yards (off-board tokens list)
     this.renderYards();
+    
+    // Explicitly adjust scale for mobile view
+    if (typeof adjustBoardScale === 'function') {
+      adjustBoardScale();
+    }
   },
 
   createPawnElement(pawn, playerIdx, isGatti) {
