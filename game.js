@@ -384,6 +384,8 @@ const GameState = {
         if (up) mouthsUp++;
         shellStates.push(up);
       }
+      
+      this.lastShellStates = shellStates;
 
       // Render shell visuals
       shells.forEach((s, idx) => {

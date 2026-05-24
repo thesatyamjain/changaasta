@@ -13,8 +13,6 @@
     document.head.appendChild(link);
   }
 
-  let frame = 0;
-
   function drawCowrie(x, y, angle, isFaceUp) {
     ctx.save();
     ctx.translate(x, y);
@@ -43,16 +41,23 @@
     ctx.restore();
   }
 
+  let startTime = Date.now();
+
   function animate() {
     ctx.clearRect(0, 0, 32, 32);
     
-    // If we have access to GameState, we could animate fast during rolling,
-    // but a continuous gentle animation is also nice.
-    const isRolling = (window.GameState && window.GameState.isRollingAnim);
+    const elapsed = Date.now() - startTime;
+    // Each phase (0 to 4 openings) lasts 2 seconds
+    const cycleDuration = 2000; 
+    const currentCycle = Math.floor(elapsed / cycleDuration);
+    const cycleTime = elapsed % cycleDuration;
     
-    const time = Date.now() / (isRolling ? 50 : 250); 
+    // Current target state (0 to 4 mouths open)
+    const state = currentCycle % 5; 
     
-    // 4 Cowries arranged in a cross or square
+    // First 400ms of the cycle is a "rolling" shake transition
+    const isRolling = cycleTime < 400; 
+    
     const positions = [
       { x: 10, y: 10, phase: 0 },
       { x: 22, y: 10, phase: 1 },
@@ -60,27 +65,27 @@
       { x: 22, y: 22, phase: 3 }
     ];
     
-    positions.forEach(pos => {
-      // Add jiggle
-      const jiggleX = Math.sin(time * 2 + pos.phase) * (isRolling ? 3 : 0.5);
-      const jiggleY = Math.cos(time * 2.3 + pos.phase) * (isRolling ? 3 : 0.5);
+    positions.forEach((pos, idx) => {
+      // Fast jitter when rolling, slow breathing when idle
+      const jiggleX = isRolling ? Math.sin(elapsed * 0.05 + pos.phase) * 3 : Math.sin(elapsed * 0.002 + pos.phase) * 0.3;
+      const jiggleY = isRolling ? Math.cos(elapsed * 0.04 + pos.phase) * 3 : Math.cos(elapsed * 0.003 + pos.phase) * 0.3;
       
-      const angle = Math.sin(time * 0.5 + pos.phase) * (isRolling ? Math.PI : 0.2);
+      const angle = isRolling ? Math.sin(elapsed * 0.02 + pos.phase) * Math.PI : Math.sin(elapsed * 0.001 + pos.phase) * 0.1;
       
-      // Face up or down cycle
-      // If rolling, flip wildly. If not, cycle slowly.
-      const cycleTime = isRolling ? Math.floor(frame / 2) : Math.floor(frame / 20);
-      const isFaceUp = (cycleTime + pos.phase) % 2 === 0;
+      let isFaceUp;
+      if (isRolling) {
+         isFaceUp = Math.random() > 0.5;
+      } else {
+         isFaceUp = idx < state;
+      }
 
       drawCowrie(pos.x + jiggleX, pos.y + jiggleY, angle, isFaceUp);
     });
     
     link.href = canvas.toDataURL('image/png');
     
-    frame++;
-    
-    // 15 FPS when rolling, 5 FPS when idle
-    setTimeout(animate, isRolling ? 66 : 200); 
+    // High framerate while rolling, low framerate when idle (saves battery)
+    setTimeout(animate, isRolling ? 66 : 250); 
   }
 
   // Start animation
