@@ -307,6 +307,7 @@ const GameState = {
     this.rollQueue = [];
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
+    this.isRollingAnim = false;
     
     // Pre-calculate paths
     const colors = ['red', 'green', 'yellow', 'blue'];
@@ -361,7 +362,8 @@ const GameState = {
 
   // Calculate cowrie rolls
   rollCowries() {
-    if (this.gamePhase !== 'rolling') return;
+    if (this.gamePhase !== 'rolling' || this.isRollingAnim) return;
+    this.isRollingAnim = true;
     
     synth.playRoll();
     
@@ -370,6 +372,7 @@ const GameState = {
     shells.forEach(s => s.classList.add('rolling'));
 
     setTimeout(() => {
+      this.isRollingAnim = false;
       shells.forEach(s => s.classList.remove('rolling'));
 
       const cowrieCount = this.gridSize === 5 ? 4 : 6;
@@ -448,6 +451,22 @@ const GameState = {
   updateRollQueueUI() {
     const queuePanel = document.getElementById('roll-queue');
     if (!queuePanel) return;
+
+    if (this.gamePhase === 'moving' && this.rollQueue.length > 0 && this.selectedRollIndex !== null) {
+      const currentVal = this.rollQueue[this.selectedRollIndex];
+      const player = this.getCurrentPlayer();
+      const canMoveCurrent = player.pawns.some(p => this.isValidPawnMove(p, currentVal));
+      
+      if (!canMoveCurrent) {
+        const validIdx = this.rollQueue.findIndex(val => 
+          player.pawns.some(p => this.isValidPawnMove(p, val))
+        );
+        if (validIdx !== -1) {
+          this.selectedRollIndex = validIdx;
+        }
+      }
+    }
+
     queuePanel.innerHTML = '';
     
     this.rollQueue.forEach((val, idx) => {
@@ -518,9 +537,9 @@ const GameState = {
         const cell = path[idx];
         const isLast = idx === nextIndex;
         
-        // Find if there is a Gatti on this cell
-        const gattiPawn = this.getGattiOnCell(cell.r, cell.c);
-        if (gattiPawn && gattiPawn.color !== pawn.color) {
+        // Find if there is an opponent Gatti on this cell
+        const gattiPawn = this.getOpponentGattiOnCell(cell.r, cell.c, pawn.color);
+        if (gattiPawn) {
           // Gatti acts as blockade - cannot land on it or pass it unless landing exactly to cut it with another Gatti
           if (isLast && pawn.isGatti) {
             return true; // Opponent Gatti can be cut by our Gatti landing on it
@@ -533,8 +552,9 @@ const GameState = {
     return true;
   },
 
-  getGattiOnCell(r, c) {
+  getOpponentGattiOnCell(r, c, myColor) {
     for (let p of this.players) {
+      if (p.color === myColor) continue;
       const gatti = p.pawns.find(pawn => pawn.isGatti && pawn.pathIndex !== -1 && this.paths[pawn.color][pawn.pathIndex].r === r && this.paths[pawn.color][pawn.pathIndex].c === c);
       if (gatti) return gatti;
     }
@@ -543,8 +563,9 @@ const GameState = {
 
   hasAnyValidMoves() {
     if (this.rollQueue.length === 0) return false;
-    const val = this.rollQueue[this.selectedRollIndex];
-    return this.players[this.currentPlayerIndex].pawns.some(p => this.isValidPawnMove(p, val));
+    return this.rollQueue.some(val => 
+      this.players[this.currentPlayerIndex].pawns.some(p => this.isValidPawnMove(p, val))
+    );
   },
 
   // Triggered when pawn is clicked
@@ -592,6 +613,18 @@ const GameState = {
     
     // Handle Pawn movement
     pawn.pathIndex = nextIndex;
+
+    if (pawn.isGatti) {
+      const partner = player.pawns.find(other => 
+        other.id !== pawn.id && 
+        other.isGatti && 
+        other.pathIndex === originalPathIndex
+      );
+      if (partner) {
+        partner.pathIndex = nextIndex;
+      }
+    }
+
     const targetCell = this.paths[pawn.color][nextIndex];
 
     // Logging
@@ -665,7 +698,6 @@ const GameState = {
     if (extraRollGained) {
       this.gamePhase = 'rolling';
       this.consecutiveHighRolls = 0;
-      this.rollQueue = [];
       this.selectedRollIndex = null;
       this.updateRollQueueUI();
       this.addLog('System', `${player.name} ko ek aur mauka mila!`);
@@ -930,34 +962,36 @@ const GameState = {
 
         // Group same-player pawns or stack multiple pawns
         if (pawnsInCell.length > 0) {
-          // If all are the same color, check Gatti
-          const allSameColor = pawnsInCell.every(item => item.pawn.color === pawnsInCell[0].pawn.color);
+          const renderedItems = [];
           
-          if (this.rules.gattiEnabled && allSameColor && pawnsInCell.length >= 2 && pawnsInCell[0].pawn.isGatti) {
-            // Draw a single Gatti pawn
-            const item = pawnsInCell[0];
-            const pEl = this.createPawnElement(item.pawn, item.playerIdx, true);
-            cell.appendChild(pEl);
-            
-            // If there's 4 pawns merged (e.g. 2 Gattis), add a badge
-            if (pawnsInCell.length > 2) {
-              const badge = document.createElement('div');
-              badge.className = 'pawn-count-badge';
-              badge.innerText = `x${Math.floor(pawnsInCell.length / 2)}`;
-              pEl.appendChild(badge);
+          // Separate into Gattis and Singles
+          const gattis = pawnsInCell.filter(item => item.pawn.isGatti);
+          const singles = pawnsInCell.filter(item => !item.pawn.isGatti);
+          
+          // Add one element per Gatti pair
+          for (let i = 0; i < gattis.length; i += 2) {
+            if (gattis[i]) {
+              renderedItems.push({ pawn: gattis[i].pawn, playerIdx: gattis[i].playerIdx, isGatti: true });
             }
-          } else {
-            // Render individual pawns stacked overlapping
-            pawnsInCell.forEach((item, index) => {
-              const pEl = this.createPawnElement(item.pawn, item.playerIdx, false);
-              // Slight styling adjustments for stacking overlaps
-              if (pawnsInCell.length > 1) {
-                pEl.style.transform = `translate(${index * 4 - (pawnsInCell.length * 2)}px, ${index * 4 - (pawnsInCell.length * 2)}px)`;
-                pEl.style.position = 'absolute';
-              }
-              cell.appendChild(pEl);
-            });
           }
+          
+          // Add all singles
+          singles.forEach(single => {
+            renderedItems.push({ pawn: single.pawn, playerIdx: single.playerIdx, isGatti: false });
+          });
+          
+          renderedItems.forEach((item, index) => {
+            const pEl = this.createPawnElement(item.pawn, item.playerIdx, item.isGatti);
+            if (renderedItems.length > 1) {
+              pEl.style.transform = `translate(${index * 4 - (renderedItems.length * 2)}px, ${index * 4 - (renderedItems.length * 2)}px)`;
+              pEl.style.position = 'absolute';
+            }
+            
+            // If there are multiple Gattis (e.g., 2 Gattis = 4 pawns), we could add a badge.
+            // But visually, rendering them stacked works fine. 
+            
+            cell.appendChild(pEl);
+          });
         }
 
         boardGrid.appendChild(cell);

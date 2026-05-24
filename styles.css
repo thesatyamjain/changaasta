@@ -819,7 +819,51 @@ header p {
 
 @media (max-width: 750px) {
   .board-outer-container {
-    padding: 100px 50px;
+    padding: 80px 20px;
     /* JS will dynamically handle the transform scaling */
+  }
+
+  header h1 {
+    font-size: 2rem;
+    letter-spacing: 1px;
+  }
+
+  header p {
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+  }
+
+  #setup-screen {
+    padding: 20px 15px;
+  }
+
+  .player-setup-card {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+
+  .player-setup-card input {
+    padding: 8px;
+    font-size: 0.9rem;
+    min-width: 0; /* Prevent input from pushing select out of bounds */
+  }
+
+  .player-setup-card select {
+    padding: 8px 5px;
+    font-size: 0.85rem;
+  }
+
+  .cowrie-shell {
+    width: 24px;
+    height: 36px;
+  }
+
+  .sidebar {
+    padding: 20px;
+  }
+
+  #roll-btn {
+    padding: 12px;
+    font-size: 1.1rem;
   }
 }
