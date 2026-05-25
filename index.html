@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Changa Asta - Chalkboard Edition</title>
-  <meta name="description" content="Play the premium chalkboard edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara) against friends or smart AI bots.">
+  <title>Changa Asta - Royal Gold & Slate Edition</title>
+  <meta name="description" content="Play the premium Royal Gold & Slate edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara) against friends or smart AI bots.">
   
   <!-- Open Graph / Social Sharing Meta Tags -->
-  <meta property="og:title" content="Changa Asta - The Ancient Game of Strategy">
-  <meta property="og:description" content="Play the premium chalkboard edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara) against friends or smart AI bots.">
+  <meta property="og:title" content="Changa Asta - The Royal Strategy Game">
+  <meta property="og:description" content="Play the premium Royal Gold & Slate edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara) against friends or smart AI bots.">
   <meta property="og:image" content="https://changaasta.pages.dev/preview.png">
   <meta property="og:url" content="https://changaasta.pages.dev">
   <meta property="og:type" content="website">
-
+ 
   <!-- Twitter Card Meta Tags -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Changa Asta - The Ancient Game of Strategy">
-  <meta name="twitter:description" content="Play the premium chalkboard edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara) against friends or smart AI bots.">
+  <meta name="twitter:title" content="Changa Asta - The Royal Strategy Game">
+  <meta name="twitter:description" content="Play the premium Royal Gold & Slate edition of the ancient Indian board game Changa Asta (Ashta Chamma / Chowka Bara) against friends or smart AI bots.">
   <meta name="twitter:image" content="https://changaasta.pages.dev/preview.png">
-  <meta name="theme-color" content="#1a251f">
+  <meta name="theme-color" content="#0b110e">
 
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -36,114 +36,110 @@
 
       <div class="lobby-layout">
         
-        <!-- LEFT COLUMN: GAME SETTINGS -->
-        <div class="lobby-left">
-          <!-- Board Size Settings -->
-          <div class="settings-group slide-up delay-1">
-            <span class="settings-label">Board Chunein:</span>
-            <div class="toggle-options" id="toggle-size-container">
-              <button class="btn-toggle active" data-val="5">5x5 Grid (4 Kaudi)</button>
-              <button class="btn-toggle" data-val="7">7x7 Grid (6 Kaudi)</button>
-            </div>
-            <input type="hidden" id="select-size" data-value="5">
+        <!-- Board Size Settings -->
+        <div class="settings-group settings-board slide-up delay-1">
+          <span class="settings-label">Board Chunein:</span>
+          <div class="toggle-options" id="toggle-size-container">
+            <button class="btn-toggle active" data-val="5">5x5 Grid (4 Kaudi)</button>
+            <button class="btn-toggle" data-val="7">7x7 Grid (6 Kaudi)</button>
           </div>
+          <input type="hidden" id="select-size" data-value="5">
+        </div>
 
-          <!-- Player Count Settings -->
-          <div class="settings-group slide-up delay-2">
-            <span class="settings-label">Khiladi Ki Sankhya:</span>
-            <div class="toggle-options" id="toggle-count-container">
-              <button class="btn-toggle" data-val="2" onclick="window.selectPlayerCount(2)">2 Players</button>
-              <button class="btn-toggle" data-val="3" onclick="window.selectPlayerCount(3)">3 Players</button>
-              <button class="btn-toggle active" data-val="4" onclick="window.selectPlayerCount(4)">4 Players</button>
-            </div>
-            <input type="hidden" id="select-count" data-value="4">
+        <!-- Player Count Settings -->
+        <div class="settings-group settings-count slide-up delay-2">
+          <span class="settings-label">Khiladi Ki Sankhya:</span>
+          <div class="toggle-options" id="toggle-count-container">
+            <button class="btn-toggle" data-val="2" onclick="window.selectPlayerCount(2)">2 Players</button>
+            <button class="btn-toggle" data-val="3" onclick="window.selectPlayerCount(3)">3 Players</button>
+            <button class="btn-toggle active" data-val="4" onclick="window.selectPlayerCount(4)">4 Players</button>
           </div>
+          <input type="hidden" id="select-count" data-value="4">
+        </div>
 
-          <!-- Game Mode Settings -->
-          <div class="settings-group slide-up delay-3">
-            <span class="settings-label">Khelne Ka Tareeka:</span>
-            <div class="toggle-options" id="toggle-mode-container">
-              <button class="btn-toggle active" data-val="local" onclick="window.selectGameMode('local')">Pass & Play</button>
-              <button class="btn-toggle" data-val="bot" onclick="window.selectGameMode('bot')">Vs Computer</button>
-            </div>
-            <input type="hidden" id="select-mode" data-value="local">
+        <!-- Game Mode Settings -->
+        <div class="settings-group settings-mode slide-up delay-3">
+          <span class="settings-label">Khelne Ka Tareeka:</span>
+          <div class="toggle-options" id="toggle-mode-container">
+            <button class="btn-toggle active" data-val="local" onclick="window.selectGameMode('local')">Pass & Play</button>
+            <button class="btn-toggle" data-val="bot" onclick="window.selectGameMode('bot')">Vs Computer</button>
           </div>
+          <input type="hidden" id="select-mode" data-value="local">
+        </div>
 
-          <!-- Advanced Rules Toggles -->
-          <div class="settings-group slide-up delay-4">
-            <span class="settings-label">Niyam Chunein:</span>
-            <div class="toggle-options">
-              <button class="btn-toggle active" id="rule-gatti">Gatti Banana (Blockades)</button>
-              <button class="btn-toggle active" id="rule-spawn">Ghar Se Nikalna (4/8/6/12 Par)</button>
+        <!-- PLAYER ROSTER -->
+        <div class="settings-group roster-group settings-roster slide-up delay-5">
+          <span class="settings-label">Khiladi Chunein:</span>
+          <div class="player-setup-grid">
+            
+            <!-- South (Red) -->
+            <div class="player-setup-card card-red">
+              <div class="card-header">
+                <span class="color-indicator red"></span>
+                <input type="text" id="name-red" value="Neeche Wala (Red)" placeholder="Red Name">
+              </div>
+              <div class="segmented-control bot-toggle-wrapper" id="seg-red" style="display: none;">
+                <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('red', 'human')">Insaan</button>
+                <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('red', 'bot')">Computer</button>
+              </div>
+              <input type="hidden" id="type-red" value="human">
             </div>
+
+            <!-- West (Green) -->
+            <div class="player-setup-card card-green">
+              <div class="card-header">
+                <span class="color-indicator green"></span>
+                <input type="text" id="name-green" value="Baayein Wala (Green)" placeholder="Green Name">
+              </div>
+              <div class="segmented-control bot-toggle-wrapper" id="seg-green" style="display: none;">
+                <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('green', 'human')">Insaan</button>
+                <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('green', 'bot')">Computer</button>
+              </div>
+              <input type="hidden" id="type-green" value="human">
+            </div>
+
+            <!-- North (Yellow) -->
+            <div class="player-setup-card card-yellow">
+              <div class="card-header">
+                <span class="color-indicator yellow"></span>
+                <input type="text" id="name-yellow" value="Upar Wala (Yellow)" placeholder="Yellow Name">
+              </div>
+              <div class="segmented-control bot-toggle-wrapper" id="seg-yellow" style="display: none;">
+                <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('yellow', 'human')">Insaan</button>
+                <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('yellow', 'bot')">Computer</button>
+              </div>
+              <input type="hidden" id="type-yellow" value="human">
+            </div>
+
+            <!-- East (Blue) -->
+            <div class="player-setup-card card-blue">
+              <div class="card-header">
+                <span class="color-indicator blue"></span>
+                <input type="text" id="name-blue" value="Daayein Wala (Blue)" placeholder="Blue Name">
+              </div>
+              <div class="segmented-control bot-toggle-wrapper" id="seg-blue" style="display: none;">
+                <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('blue', 'human')">Insaan</button>
+                <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('blue', 'bot')">Computer</button>
+              </div>
+              <input type="hidden" id="type-blue" value="human">
+            </div>
+
           </div>
         </div>
 
-        <!-- RIGHT COLUMN: PLAYER ROSTER -->
-        <div class="lobby-right slide-up delay-5">
-          <div class="settings-group roster-group">
-            <span class="settings-label">Khiladi Chunein:</span>
-            <div class="player-setup-grid">
-              
-              <!-- South (Red) -->
-              <div class="player-setup-card card-red">
-                <div class="card-header">
-                  <span class="color-indicator red"></span>
-                  <input type="text" id="name-red" value="Neeche Wala (Red)" placeholder="Red Name">
-                </div>
-                <div class="segmented-control bot-toggle-wrapper" id="seg-red" style="display: none;">
-                  <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('red', 'human')">Insaan</button>
-                  <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('red', 'bot')">Computer</button>
-                </div>
-                <input type="hidden" id="type-red" value="human">
-              </div>
-
-              <!-- West (Green) -->
-              <div class="player-setup-card card-green">
-                <div class="card-header">
-                  <span class="color-indicator green"></span>
-                  <input type="text" id="name-green" value="Baayein Wala (Green)" placeholder="Green Name">
-                </div>
-                <div class="segmented-control bot-toggle-wrapper" id="seg-green" style="display: none;">
-                  <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('green', 'human')">Insaan</button>
-                  <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('green', 'bot')">Computer</button>
-                </div>
-                <input type="hidden" id="type-green" value="human">
-              </div>
-
-              <!-- North (Yellow) -->
-              <div class="player-setup-card card-yellow">
-                <div class="card-header">
-                  <span class="color-indicator yellow"></span>
-                  <input type="text" id="name-yellow" value="Upar Wala (Yellow)" placeholder="Yellow Name">
-                </div>
-                <div class="segmented-control bot-toggle-wrapper" id="seg-yellow" style="display: none;">
-                  <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('yellow', 'human')">Insaan</button>
-                  <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('yellow', 'bot')">Computer</button>
-                </div>
-                <input type="hidden" id="type-yellow" value="human">
-              </div>
-
-              <!-- East (Blue) -->
-              <div class="player-setup-card card-blue">
-                <div class="card-header">
-                  <span class="color-indicator blue"></span>
-                  <input type="text" id="name-blue" value="Daayein Wala (Blue)" placeholder="Blue Name">
-                </div>
-                <div class="segmented-control bot-toggle-wrapper" id="seg-blue" style="display: none;">
-                  <button class="seg-btn active" data-val="human" onclick="window.selectPlayerType('blue', 'human')">Insaan</button>
-                  <button class="seg-btn" data-val="bot" onclick="window.selectPlayerType('blue', 'bot')">Computer</button>
-                </div>
-                <input type="hidden" id="type-blue" value="human">
-              </div>
-
-            </div>
+        <!-- Advanced Rules Toggles -->
+        <div class="settings-group settings-rules slide-up delay-4">
+          <span class="settings-label">Niyam Chunein:</span>
+          <div class="toggle-options">
+            <button class="btn-toggle active" id="rule-gatti">Gatti Banana (Blockades)</button>
+            <button class="btn-toggle active" id="rule-spawn">Ghar Se Nikalna (4/8/6/12 Par)</button>
           </div>
         </div>
+
       </div>
 
-      <div class="slide-up delay-6" style="display: flex; flex-direction: column;">
-        <button class="btn-primary" onclick="window.startGame()">KHEL SHURU KAREIN</button>
+      <div class="slide-up delay-6" style="display: flex; justify-content: center; width: 100%;">
+        <button class="btn-primary" onclick="window.startGame()" style="width: 100%; max-width: 320px; padding: 15px 30px;">KHEL SHURU KAREIN</button>
       </div>
     </div>
 
