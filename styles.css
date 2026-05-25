@@ -991,99 +991,134 @@ header p {
 
 @media (max-width: 750px) {
   body {
-    /* Prevent the vertical centering from shifting the board when sidebar height changes */
     justify-content: flex-start;
-    padding-top: 20px;
-  }
-  .board-wrapper {
-    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 80px; /* Space for bottom docked controls */
   }
 
-  .yard-pocket {
-    width: 60px;
-    height: 60px;
+  header {
+    display: none; /* Hide title during gameplay to save space */
   }
-  
-  .yard-pocket.top, .yard-pocket.bottom {
-    margin-left: -30px;
+
+  #game-screen {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+    align-items: center;
+    width: 100vw;
+    height: 100%;
+    justify-content: center;
   }
-  
-  .yard-pocket.left, .yard-pocket.right {
-    margin-top: -30px;
+
+  .sidebar-left {
+    display: none; /* Hide log panel by default on mobile */
   }
 
   .board-outer-container {
-    padding: 80px 20px;
-    /* JS will dynamically handle the transform scaling */
-  }
-
-  header h1 {
-    font-size: 2rem;
-    letter-spacing: 1px;
-  }
-
-  header p {
-    font-size: 0.85rem;
-    margin-bottom: 5px;
-  }
-}
-
-/* Tablets and smaller desktop */
-@media (max-width: 1050px) {
-  #game-screen {
+    padding: 0;
+    width: 100vw;
     display: flex;
-    flex-direction: column;
-    padding: 10px;
-    align-items: center;
-  }
-}
-
-/* Phones */
-@media (max-width: 750px) {
-  #game-screen {
-    display: flex;
-    flex-direction: column;
-    padding: 10px;
-    align-items: center;
+    justify-content: center;
+    margin-top: 50px;
+    margin-bottom: 50px;
   }
 
-  /* Lobby collapse */
-  .lobby-layout {
-    flex-direction: column;
-    gap: 20px;
+  .board-frame {
+    border: none; /* Remove bulky frame on mobile */
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .board-grid.size-5, .board-grid.size-7 {
+    width: 96vw;
+    height: 96vw;
   }
   
-  #setup-screen {
-    padding: 20px 15px;
+  .board-grid.size-5 {
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
   }
 
-  .player-setup-grid {
-    grid-template-columns: 1fr 1fr;
+  .board-grid.size-7 {
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+  }
+
+  .yard-pocket {
+    width: 65px;
+    height: 65px;
+    padding: 5px;
+  }
+
+  .pawn {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Reposition pockets above and below the board */
+  .yard-pocket.top { top: -75px; left: 75%; transform: translateX(-50%); }
+  .yard-pocket.left { left: 25%; top: -75px; transform: translateX(-50%); margin: 0; }
+  .yard-pocket.bottom { bottom: -75px; left: 25%; transform: translateX(-50%); margin: 0; }
+  .yard-pocket.right { right: auto; top: auto; left: 75%; bottom: -75px; transform: translateX(-50%); margin: 0; }
+
+  /* Dock controls to bottom */
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: rgba(10, 15, 12, 0.98);
+    z-index: 1000;
+    border-top: 1px solid var(--border-glass);
+    border-radius: 0;
     gap: 10px;
   }
 
-  .player-setup-card {
-    padding: 12px 10px;
-    gap: 8px;
-  }
-
-  .player-setup-card input {
-    padding: 8px;
-    font-size: 0.9rem;
+  .player-turn-indicator {
+    padding: 5px;
+    flex-direction: row;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    flex: 1;
     min-width: 0;
   }
 
-  .cowrie-shell {
-    width: 24px;
-    height: 36px;
+  .status-avatar { font-size: 18px; margin-right: 8px; }
+  .turn-name-container { align-items: flex-start; }
+  .player-tag { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+  .phase-tag { font-size: 0.65rem; }
+
+  .roll-panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    flex-direction: row;
+    gap: 8px;
+    flex: 1;
+    justify-content: flex-end;
   }
 
-  .sidebar {
-    padding: 20px;
-  }
+  .shells-container { gap: 3px; }
+  .cowrie-shell { width: 14px; height: 22px; }
+  #btn-roll { padding: 8px 12px; font-size: 0.85rem; }
 
-  #roll-btn {
-    padding: 12px;
-    font-size: 1.1rem;
-  }
+  .queue-panel { display: none; }
+  .utility-controls { display: none; }
+
+  /* Lobby collapse */
+  .lobby-layout { flex-direction: column; gap: 20px; }
+  #setup-screen { padding: 20px 15px; }
+  .player-setup-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .player-setup-card { padding: 12px 10px; gap: 8px; }
+  .player-setup-card input { padding: 8px; font-size: 0.9rem; min-width: 0; }
 }
