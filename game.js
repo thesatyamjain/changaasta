@@ -13,12 +13,50 @@ class SoundSynth {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.rattleInterval = null;
   }
 
   init() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
+  }
+
+  startRattle() {
+    if (this.muted) return;
+    this.init();
+    if (this.rattleInterval) return;
+    
+    const playClick = () => {
+      if (this.muted || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180 + Math.random() * 320, now);
+      
+      gain.gain.setValueAtTime(0.05 + Math.random() * 0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.005, now + 0.05);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start(now);
+      osc.stop(now + 0.06);
+    };
+
+    playClick();
+    this.rattleInterval = setInterval(playClick, 75);
+  }
+
+  stopRattle() {
+    if (this.rattleInterval) {
+      clearInterval(this.rattleInterval);
+      this.rattleInterval = null;
+    }
+    // Play the final clatter clack
+    this.playRoll();
   }
 
   playRoll() {
@@ -124,6 +162,10 @@ class SoundSynth {
     });
   }
 
+  playVictory() {
+    this.playWin();
+  }
+
   playToggle() {
     if (this.muted) return;
     this.init();
@@ -142,6 +184,67 @@ class SoundSynth {
 }
 
 const synth = new SoundSynth();
+
+// --- SOTA Cowrie Physics & Probability Engine ---
+const CowriePhysicsEngine = {
+  // Base probability of landing mouth UP
+  // Cowries naturally tend to land mouth up because the back is heavy and rounded, while the mouth is flat.
+  baseBiasUp: 0.58, 
+  
+  generateRoll(cowrieCount, throwStrength = null) {
+    const results = [];
+    const positions = [];
+    let mouthsUp = 0;
+    
+    // 1. Determine Throw Strength (0.0 to 1.0)
+    // A harder throw makes it more random (closer to 0.5), softer keeps the bias.
+    const finalStrength = throwStrength !== null ? throwStrength : Math.random(); 
+    
+    for (let i = 0; i < cowrieCount; i++) {
+      // 2. Adjust probability based on throw strength
+      // A strong throw (finalStrength close to 1) reduces bias (closer to 0.5), a weak throw preserves it.
+      const currentProb = this.baseBiasUp - (finalStrength * 0.08); 
+      
+      const isUp = Math.random() < currentProb;
+      if (isUp) mouthsUp++;
+      
+      // 3. Generate non-overlapping random scattering coordinates
+      // Bounding box size scales with throw strength (harder toss = wider scatter)
+      const rangeX = 100 + finalStrength * 100; // 100px to 200px spread
+      const rangeY = 40 + finalStrength * 40;   // 40px to 80px spread
+      
+      let x, y, rot, overlap;
+      let attempts = 0;
+      do {
+        x = (Math.random() - 0.5) * rangeX; 
+        y = (Math.random() - 0.5) * rangeY; 
+        rot = (Math.random() - 0.5) * 180; // Random rotation
+        
+        // Simple overlap check
+        overlap = false;
+        for (let j = 0; j < positions.length; j++) {
+          const dx = positions[j].x - x;
+          const dy = positions[j].y - y;
+          if (Math.sqrt(dx*dx + dy*dy) < 38) { // Min distance to prevent clipping
+            overlap = true;
+            break;
+          }
+        }
+        attempts++;
+      } while (overlap && attempts < 25);
+      
+      positions.push({ x, y, rot, isUp });
+      results.push(isUp);
+    }
+    
+    return {
+      mouthsUp,
+      states: results,
+      positions,
+      throwStrength: finalStrength
+    };
+  }
+};
 
 // Game Configuration & Math Module
 const GameEngine = {
@@ -356,29 +459,42 @@ const GameState = {
   },
 
   // Calculate cowrie rolls
-  rollCowries() {
+  rollCowries(throwStrength = null) {
     if (this.gamePhase !== 'rolling' || this.isRollingAnim) return;
+    
+    // Redirect bot rolls to simulateBotChargeAndRoll if no strength is specified
+    const player = this.getCurrentPlayer();
+    if (player.isBot && throwStrength === null) {
+      this.simulateBotChargeAndRoll();
+      return;
+    }
+    
     this.isRollingAnim = true;
     
-    synth.playRoll();
+    // Set custom animation speed based on throw strength
+    const finalStrength = throwStrength !== null ? throwStrength : (0.3 + Math.random() * 0.5);
+    const animDuration = 0.45 + (1 - finalStrength) * 0.4; // 0.45s to 0.85s
+    
+    // Play rattle stop and roll clatter
+    synth.stopRattle(); 
     
     // Animate rolling shells in DOM
     const shells = document.querySelectorAll('.cowrie-shell');
-    shells.forEach(s => s.classList.add('rolling'));
+    shells.forEach(s => {
+      s.style.setProperty('--roll-duration', `${animDuration}s`);
+      s.classList.add('rolling');
+    });
 
     setTimeout(() => {
       this.isRollingAnim = false;
       shells.forEach(s => s.classList.remove('rolling'));
 
       const cowrieCount = this.gridSize === 5 ? 4 : 6;
-      let mouthsUp = 0;
-      const shellStates = [];
       
-      for (let i = 0; i < cowrieCount; i++) {
-        const up = Math.random() < 0.5;
-        if (up) mouthsUp++;
-        shellStates.push(up);
-      }
+      // Use SOTA Cowrie Physics Engine
+      const rollData = CowriePhysicsEngine.generateRoll(cowrieCount, finalStrength);
+      const mouthsUp = rollData.mouthsUp;
+      const shellStates = rollData.states;
       
       this.lastShellStates = shellStates;
 
@@ -386,11 +502,15 @@ const GameState = {
       shells.forEach((s, idx) => {
         if (idx < cowrieCount) {
           const isUp = shellStates[idx];
+          const pos = rollData.positions[idx];
+          
           s.className = `cowrie-shell ${isUp ? 'mouth-up' : 'mouth-down'}`;
           
-          // Apply a random rotation to make the scattered shells look realistic
-          const randomRot = Math.floor(Math.random() * 80) - 40; // -40 to 40 degrees
-          s.style.setProperty('--rand-rot', `${randomRot}deg`);
+          // Apply physics positioning via CSS custom properties
+          s.style.setProperty('--rand-rot', `${pos.rot}deg`);
+          s.style.setProperty('--tx', `${pos.x}px`);
+          s.style.setProperty('--ty', `${pos.y}px`);
+          s.style.setProperty('--end-ry', isUp ? '0deg' : '180deg');
           
           s.style.display = 'block';
         } else {
@@ -853,89 +973,252 @@ const GameState = {
     if (this.gamePhase !== 'moving') return;
     
     const player = this.getCurrentPlayer();
-    const value = this.rollQueue[this.selectedRollIndex];
     
-    let bestMove = null;
-    let maxScore = -9999;
-    
-    player.pawns.forEach(pawn => {
-      if (!this.isValidPawnMove(pawn, value)) return;
-      
-      let score = 0;
-      const currentIdx = pawn.pathIndex;
-      let nextIdx = currentIdx === -1 ? 0 : currentIdx + value;
-      const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
-      
-      if (currentIdx !== -1 && !player.hasKilled && nextIdx >= firstInnerIndex) {
-        nextIdx = nextIdx % firstInnerIndex;
+    // Deep clone state for simulation
+    const getInitialSimState = () => {
+      return {
+        pawns: player.pawns.map(p => ({ id: p.id, pathIndex: p.pathIndex, isGatti: p.isGatti })),
+        hasKilled: player.hasKilled,
+        opponents: this.players
+          .filter((_, idx) => idx !== this.currentPlayerIndex)
+          .map(opp => ({
+            color: opp.color,
+            pawns: opp.pawns.map(p => ({ id: p.id, pathIndex: p.pathIndex, isGatti: p.isGatti }))
+          }))
+      };
+    };
+
+    const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+    const goalIndex = this.paths[player.color].length - 1;
+
+    // Simulated check for opponent Gatti blockade
+    const getOpponentGattiOnCellSim = (simState, r, c) => {
+      for (let opp of simState.opponents) {
+        const oppPath = this.paths[opp.color];
+        const gatti = opp.pawns.find(oppP => 
+          oppP.isGatti && oppP.pathIndex !== -1 &&
+          oppPath[oppP.pathIndex].r === r && oppPath[oppP.pathIndex].c === c
+        );
+        if (gatti) return gatti;
+      }
+      return null;
+    };
+
+    // Simulated validity check
+    const isValidPawnMoveSim = (simState, pawn, value) => {
+      if (pawn.pathIndex === -1) {
+        if (this.rules.spawnRequired) {
+          const isSpawnRoll = this.gridSize === 5 ? (value === 4 || value === 8) : (value === 6 || value === 12);
+          return isSpawnRoll;
+        }
+        return true;
       }
       
-      const targetCell = this.paths[pawn.color][nextIdx];
-      const isTargetSafe = GameEngine.isSafeCell(this.gridSize, targetCell.r, targetCell.c);
+      let nextIndex = pawn.pathIndex + value;
+      if (simState.hasKilled && nextIndex > goalIndex) return false;
       
-      // 1. Capture/Kill opportunity (Highest priority)
-      if (!isTargetSafe) {
-        this.players.forEach((opp, oppIdx) => {
-          if (oppIdx === this.currentPlayerIndex) return;
+      const path = this.paths[player.color];
+      
+      if (this.rules.gattiEnabled) {
+        for (let step = 1; step <= value; step++) {
+          let idx = pawn.pathIndex + step;
+          if (!simState.hasKilled && idx >= firstInnerIndex) {
+            idx = idx % firstInnerIndex;
+          }
+          const cell = path[idx];
+          const isLast = step === value;
+          
+          const oppGatti = getOpponentGattiOnCellSim(simState, cell.r, cell.c);
+          if (oppGatti) {
+            if (isLast && pawn.isGatti) return true; // Can land on Gatti with Gatti
+            return false; // Blocked
+          }
+        }
+      }
+      return true;
+    };
+
+    // Simulated move execution
+    const simulateMove = (simState, pawnId, value) => {
+      const nextState = {
+        pawns: simState.pawns.map(p => ({ ...p })),
+        hasKilled: simState.hasKilled,
+        opponents: simState.opponents.map(opp => ({
+          color: opp.color,
+          pawns: opp.pawns.map(p => ({ ...p }))
+        }))
+      };
+
+      const pawn = nextState.pawns.find(p => p.id === pawnId);
+      const originalPathIndex = pawn.pathIndex;
+      
+      let nextIndex = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + value;
+      if (pawn.pathIndex !== -1 && !nextState.hasKilled && nextIndex >= firstInnerIndex) {
+        nextIndex = nextIndex % firstInnerIndex;
+      }
+
+      // Move the pawn (and its partner if Gatti)
+      pawn.pathIndex = nextIndex;
+      if (pawn.isGatti) {
+        const partner = nextState.pawns.find(other => 
+          other.id !== pawn.id && other.isGatti && other.pathIndex === originalPathIndex
+        );
+        if (partner) partner.pathIndex = nextIndex;
+      }
+
+      const targetCell = this.paths[player.color][nextIndex];
+      const isSafe = GameEngine.isSafeCell(this.gridSize, targetCell.r, targetCell.c);
+      let captureOccurred = false;
+
+      // Handle captures
+      if (!isSafe) {
+        nextState.opponents.forEach(opp => {
+          const oppPath = this.paths[opp.color];
           opp.pawns.forEach(oppP => {
             if (oppP.pathIndex !== -1) {
-              const oppCell = this.paths[oppP.color][oppP.pathIndex];
+              const oppCell = oppPath[oppP.pathIndex];
               if (oppCell.r === targetCell.r && oppCell.c === targetCell.c) {
-                score += 1500; // Major reward
+                if (this.rules.gattiEnabled && oppP.isGatti && !pawn.isGatti) {
+                  return; // Cannot capture Gatti with single
+                }
+                oppP.pathIndex = -1;
+                oppP.isGatti = false;
+                nextState.hasKilled = true;
+                captureOccurred = true;
               }
             }
           });
         });
       }
 
-      // 2. Unlocking inner path (Early game priority)
-      if (!player.hasKilled) {
-        // Reward spawns and aggressive hunting
-        if (currentIdx === -1) score += 200;
-        else score += (100 - currentIdx); // Value moving forward to chase captures
-      } else {
-        // 3. Goal progression
-        score += nextIdx * 20; // Progressing pawn towards home
-        
-        // Check if landing directly inside home center
-        if (nextIdx === this.paths[pawn.color].length - 1) {
-          score += 1000; // Immediate win progression
+      // Handle Gatti creation
+      if (this.rules.gattiEnabled && !pawn.isGatti && pawn.pathIndex !== -1 && pawn.pathIndex < goalIndex) {
+        const partner = nextState.pawns.find(other => 
+          other.id !== pawn.id && !other.isGatti && other.pathIndex === pawn.pathIndex
+        );
+        if (partner) {
+          pawn.isGatti = true;
+          partner.isGatti = true;
         }
       }
 
-      // 4. Safe house attraction
-      if (isTargetSafe) {
-        score += 250;
-      }
+      return { nextState, captureOccurred };
+    };
 
-      // 5. Danger avoidance (check if moving avoids an opponent who is behind us)
-      this.players.forEach((opp, oppIdx) => {
-        if (oppIdx === this.currentPlayerIndex) return;
-        opp.pawns.forEach(oppP => {
-          if (oppP.pathIndex !== -1 && currentIdx !== -1) {
-            const oppCell = this.paths[oppP.color][oppP.pathIndex];
-            const currentCell = this.paths[pawn.color][currentIdx];
-            // If opponent can hit us at current pos next turn, run away!
-            const dist = this.getManhattanDistance(oppCell, currentCell);
-            if (dist < 8) {
-              score += 180;
-            }
+    // Position evaluation
+    const evaluateSimState = (simState) => {
+      let score = 0;
+      
+      simState.pawns.forEach(pawn => {
+        if (pawn.pathIndex === goalIndex) {
+          score += 1500; // Finished goal is top priority
+        } else if (pawn.pathIndex === -1) {
+          score += 0;
+        } else {
+          // Goal progression
+          if (simState.hasKilled) {
+            score += pawn.pathIndex * 35;
+          } else {
+            // Encourage moving forward to chase or hunt opponents
+            score += pawn.pathIndex * 15;
           }
-        });
+
+          // Safety house
+          const cell = this.paths[player.color][pawn.pathIndex];
+          if (GameEngine.isSafeCell(this.gridSize, cell.r, cell.c)) {
+            score += 250;
+          }
+
+          // Gatti blockade bonus
+          if (this.rules.gattiEnabled && pawn.isGatti) {
+            score += 450;
+          }
+
+          // Danger checks: check if any opponent can hit us
+          simState.opponents.forEach(opp => {
+            const oppPath = this.paths[opp.color];
+            opp.pawns.forEach(oppP => {
+              if (oppP.pathIndex !== -1) {
+                const oppCell = oppPath[oppP.pathIndex];
+                const cellIdxOnOppPath = oppPath.findIndex(c => c.r === cell.r && c.c === cell.c);
+                
+                if (cellIdxOnOppPath !== -1) {
+                  const stepDiff = cellIdxOnOppPath - oppP.pathIndex;
+                  if (stepDiff > 0 && stepDiff <= (this.gridSize === 5 ? 8 : 12)) {
+                    const isSafe = GameEngine.isSafeCell(this.gridSize, cell.r, cell.c);
+                    if (!isSafe) {
+                      score -= oppP.isGatti ? 400 : 250;
+                    }
+                  }
+                }
+              }
+            });
+          });
+        }
       });
 
-      if (score > maxScore) {
-        maxScore = score;
-        bestMove = pawn;
-      }
-    });
+      return score;
+    };
 
-    if (bestMove) {
-      setTimeout(() => {
-        this.executeMove(bestMove, value);
-      }, 800);
+    // Recursive search over permutations of remaining rolls in this turn
+    const searchBestSequence = (simState, remainingRolls) => {
+      if (remainingRolls.length === 0) {
+        return { score: evaluateSimState(simState), sequence: [] };
+      }
+
+      let bestScore = -Infinity;
+      let bestSeq = [];
+
+      // Try using each roll in the remaining queue
+      for (let i = 0; i < remainingRolls.length; i++) {
+        const value = remainingRolls[i];
+        
+        simState.pawns.forEach(pawn => {
+          if (!isValidPawnMoveSim(simState, pawn, value)) return;
+          
+          const { nextState, captureOccurred } = simulateMove(simState, pawn.id, value);
+          const nextRolls = remainingRolls.filter((_, idx) => idx !== i);
+          
+          const result = searchBestSequence(nextState, nextRolls);
+          const score = result.score + (captureOccurred ? 1800 : 0); // Capture bonus in transition
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestSeq = [{ pawnId: pawn.id, value: value, rollIdx: i }].concat(result.sequence);
+          }
+        });
+      }
+
+      if (bestScore === -Infinity) {
+        // No moves possible with any of the rolls
+        return { score: evaluateSimState(simState), sequence: [] };
+      }
+
+      return { score: bestScore, sequence: bestSeq };
+    };
+
+    const initialSimState = getInitialSimState();
+    const searchResult = searchBestSequence(initialSimState, this.rollQueue);
+
+    if (searchResult.sequence.length > 0) {
+      const bestStep = searchResult.sequence[0];
+      const pawnToMove = player.pawns.find(p => p.id === bestStep.pawnId);
+      
+      const val = bestStep.value;
+      const actualIdx = this.rollQueue.indexOf(val);
+
+      if (actualIdx !== -1) {
+        setTimeout(() => {
+          this.selectedRollIndex = actualIdx;
+          this.updateRollQueueUI(); // Visual highlight
+          setTimeout(() => {
+            this.executeMove(pawnToMove, val);
+          }, 300);
+        }, 500);
+      } else {
+        this.endTurn();
+      }
     } else {
-      // Fallback
       this.endTurn();
     }
   },
@@ -1136,6 +1419,150 @@ const GameState = {
         }
       });
     });
+  },
+
+  setupRollButtonEvents() {
+    const btnRoll = document.getElementById('btn-roll');
+    if (!btnRoll) return;
+
+    let isCharging = false;
+    let chargeValue = 0;
+    let chargeDirection = 1;
+    let chargeTimer = null;
+    let clickStart = 0;
+
+    const startCharge = (e) => {
+      if (e) e.preventDefault();
+      
+      // Only allow charging if it's the rolling phase, not already rolling, and current player is a human
+      if (this.gamePhase !== 'rolling' || this.isRollingAnim || this.getCurrentPlayer().isBot) return;
+      if (isCharging) return;
+      
+      isCharging = true;
+      chargeValue = 10;
+      chargeDirection = 1;
+      clickStart = Date.now();
+
+      // Show power meter
+      const powerMeter = document.getElementById('power-meter-container');
+      const powerBar = document.getElementById('power-bar');
+      const powerText = document.getElementById('power-text');
+      if (powerMeter) powerMeter.classList.remove('hidden');
+      if (powerBar) powerBar.style.width = '10%';
+      if (powerText) powerText.innerText = '10%';
+
+      // Start rattle sound
+      synth.startRattle();
+
+      // Add shaking class to visible cowries
+      const shells = document.querySelectorAll('.cowrie-shell');
+      shells.forEach(s => s.classList.add('shaking'));
+
+      // Oscillation loop for the power bar
+      chargeTimer = setInterval(() => {
+        chargeValue += chargeDirection * 5; // Change by 5% every 20ms
+        if (chargeValue >= 100) {
+          chargeValue = 100;
+          chargeDirection = -1; // Reverse direction
+        } else if (chargeValue <= 10) {
+          chargeValue = 10;
+          chargeDirection = 1; // Reverse direction
+        }
+        
+        if (powerBar) powerBar.style.width = `${chargeValue}%`;
+        if (powerText) powerText.innerText = `${chargeValue}%`;
+      }, 20);
+    };
+
+    const stopCharge = (e) => {
+      if (!isCharging) return;
+      isCharging = false;
+      
+      if (chargeTimer) {
+        clearInterval(chargeTimer);
+        chargeTimer = null;
+      }
+
+      // Remove shake class
+      const shells = document.querySelectorAll('.cowrie-shell');
+      shells.forEach(s => s.classList.remove('shaking'));
+
+      const holdDuration = Date.now() - clickStart;
+      let finalStrength = chargeValue / 100;
+
+      // If it was a quick click, give a randomized medium throw strength
+      if (holdDuration < 150) {
+        finalStrength = 0.3 + Math.random() * 0.4;
+      }
+
+      // Perform the roll!
+      this.rollCowries(finalStrength);
+
+      // Hide power meter after a small delay to let user see their power
+      setTimeout(() => {
+        if (!isCharging) {
+          const powerMeter = document.getElementById('power-meter-container');
+          if (powerMeter) powerMeter.classList.add('hidden');
+        }
+      }, 1000);
+    };
+
+    // Attach both touch and mouse events
+    btnRoll.addEventListener('mousedown', startCharge);
+    btnRoll.addEventListener('touchstart', startCharge, { passive: false });
+
+    // Global release handlers so it registers release even if mouse drifts away from the button
+    window.addEventListener('mouseup', stopCharge);
+    window.addEventListener('touchend', stopCharge);
+    
+    // Fallback if cursor leaves the page
+    document.addEventListener('mouseleave', stopCharge);
+  },
+
+  simulateBotChargeAndRoll() {
+    this.isRollingAnim = true; // Block double rolls
+    
+    const powerMeter = document.getElementById('power-meter-container');
+    const powerBar = document.getElementById('power-bar');
+    const powerText = document.getElementById('power-text');
+    
+    if (powerMeter) powerMeter.classList.remove('hidden');
+    
+    // Start bot rattle sound
+    synth.startRattle();
+    
+    // Shaking shells
+    const shells = document.querySelectorAll('.cowrie-shell');
+    shells.forEach(s => s.classList.add('shaking'));
+    
+    // Simulated charge curve
+    let botPower = 10;
+    const targetPower = 40 + Math.floor(Math.random() * 55); // Bot shoots for 40% to 95%
+    
+    let botChargeTimer = setInterval(() => {
+      botPower += 4;
+      if (botPower >= targetPower) {
+        botPower = targetPower;
+        clearInterval(botChargeTimer);
+        
+        // Wait a small moment at peak, then roll
+        setTimeout(() => {
+          // Clean up bot shake
+          shells.forEach(s => s.classList.remove('shaking'));
+          
+          this.isRollingAnim = false; // Reset so rollCowries runs
+          this.rollCowries(botPower / 100);
+          
+          // Hide power meter
+          setTimeout(() => {
+            if (powerMeter) powerMeter.classList.add('hidden');
+          }, 1000);
+        }, 150);
+      }
+      
+      if (powerBar) powerBar.style.width = `${botPower}%`;
+      if (powerText) powerText.innerText = `${botPower}%`;
+    }, 20);
   }
 };
 
@@ -1325,4 +1752,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // which already play the sound and manage the active state.
     });
   });
+
+  // Setup the SOTA click-and-hold/touch-and-hold events for cowrie rolling
+  GameState.setupRollButtonEvents();
 });
