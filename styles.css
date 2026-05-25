@@ -1121,4 +1121,106 @@ header p {
   .player-setup-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .player-setup-card { padding: 12px 10px; gap: 8px; }
   .player-setup-card input { padding: 8px; font-size: 0.9rem; min-width: 0; }
+  
+  .segmented-control { flex-wrap: wrap; }
+  .seg-btn { font-size: 0.8rem; padding: 4px; }
+  
+  /* Prevent vertical scrolling by letting board naturally center */
+  .board-outer-container {
+    padding: 0;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    margin: auto 0;
+  }
+
+  /* Show roll queue floating above bottom bar */
+  .settings-group.slide-up.delay-2 {
+    position: fixed;
+    bottom: 75px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1001;
+    margin: 0;
+    padding: 0;
+    width: auto;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+  
+  .settings-group.slide-up.delay-2 .settings-label {
+    display: none;
+  }
+
+  .queue-panel {
+    display: flex !important;
+    background: rgba(10, 15, 12, 0.9);
+    border: 1px solid var(--gold-chalk);
+    padding: 5px 15px;
+    border-radius: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    gap: 10px;
+  }
+
+  .queue-item {
+    width: 30px;
+    height: 30px;
+    font-size: 1.1rem;
+  }
+
+  /* Reorganize Bottom Bar to stack Cowries above Player Status */
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: rgba(10, 15, 12, 0.98);
+    z-index: 1000;
+    border-top: 1px solid var(--border-glass);
+    border-radius: 0;
+    gap: 10px;
+    height: 75px; /* Fixed height to prevent shifts */
+  }
+
+  .player-turn-indicator {
+    padding: 0;
+    flex-direction: column-reverse; /* Put avatar/name below something? No, let's flex */
+    align-items: flex-start;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .status-avatar { display: none; } /* Hide avatar to save space */
+  .turn-name-container { align-items: flex-start; width: 100%; }
+  .player-tag { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+  .phase-tag { font-size: 0.7rem; color: var(--gold-chalk); }
+
+  .roll-panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    flex-direction: column; /* Stack vertically */
+    gap: 5px;
+    flex: 1;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .shells-container { gap: 3px; margin-bottom: 2px; }
+  .cowrie-shell { width: 16px; height: 24px; }
+  #btn-roll { padding: 8px 15px; font-size: 0.9rem; white-space: nowrap; }
+
+  .utility-controls { display: none; }
 }

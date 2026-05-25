@@ -1152,11 +1152,17 @@ window.toggleMute = function() {
   }
 };
 
-window.restartGame = function() {
-  synth.playToggle();
+window.restartGame = function(fromBackButton = false) {
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
   document.getElementById('victory-overlay').classList.add('hidden');
   document.getElementById('game-screen').classList.add('hidden');
   document.getElementById('setup-screen').classList.remove('hidden');
+  
+  // If restarted manually via button, clean up the history state
+  if (!fromBackButton && window.location.hash === '#game') {
+    window.isIntentionalRestart = true;
+    history.back();
+  }
 };
 
 window.selectPlayerType = function(color, type) {
@@ -1272,12 +1278,33 @@ window.startGame = function() {
   document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('game-screen').classList.remove('hidden');
   
+  // Add History State for mobile back button handling
+  history.pushState({ page: 'game' }, '', '#game');
+  
   // Render
   GameState.renderBoard();
 };
 
 // DOM init scripts for toggle buttons
 document.addEventListener('DOMContentLoaded', () => {
+  // Handle mobile hardware back button
+  window.addEventListener('popstate', (event) => {
+    if (window.isIntentionalRestart) {
+      window.isIntentionalRestart = false;
+      return;
+    }
+    
+    // If the game screen is visible and user clicked back
+    if (!document.getElementById('game-screen').classList.contains('hidden')) {
+      if (confirm("Kya aap sach mein khel chhodna chahte hain? (Are you sure you want to quit the game?)")) {
+        window.restartGame(true); // true = called from back button, don't re-trigger history.back()
+      } else {
+        // User cancelled, push state again to stay in game
+        history.pushState({ page: 'game' }, '', '#game');
+      }
+    }
+  });
+
   // Rule selectors
   const toggles = document.querySelectorAll('.btn-toggle');
   toggles.forEach(btn => {
