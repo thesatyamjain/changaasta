@@ -206,7 +206,7 @@ const CowriePhysicsEngine = {
     const isMobile = window.innerWidth <= 850;
     
     // Use layout spacing columns to prevent clustering and overlap
-    const gap = isMobile ? 22 : 60; // Spacing between columns
+    const gap = isMobile ? 24 : 60; // Spacing between columns
     const startX = -((cowrieCount - 1) * gap) / 2;
     
     for (let i = 0; i < cowrieCount; i++) {
@@ -440,7 +440,7 @@ const GameState = {
     const cowrieCount = size === 5 ? 4 : 6;
     const shells = document.querySelectorAll('.cowrie-shell');
     const isMobile = window.innerWidth <= 850;
-    const gap = isMobile ? 22 : 44; // spacing between shells
+    const gap = isMobile ? 24 : 44; // spacing between shells
     const startX = -((cowrieCount - 1) * gap) / 2;
 
     shells.forEach((s, idx) => {
@@ -1758,20 +1758,42 @@ window.restartGame = function(fromBackButton = false) {
   }
 };
 
-window.selectPlayerType = function(color, type) {
-  if (window.synth && typeof window.synth.playToggle === 'function') {
-    window.synth.playToggle();
-  }
-  
+function getActivePlayerColors(count) {
+  if (count === 2) return ['red', 'yellow'];
+  if (count === 3) return ['red', 'green', 'yellow'];
+  return ['red', 'green', 'yellow', 'blue'];
+}
+
+function setPlayerTypeUI(color, type) {
   // Update hidden input
-  document.getElementById(`type-${color}`).value = type;
+  const typeInput = document.getElementById(`type-${color}`);
+  if (typeInput) typeInput.value = type;
   
   // Update active state of segmented buttons
   const container = document.getElementById(`seg-${color}`);
   if (container) {
     container.querySelectorAll('.seg-btn').forEach(btn => btn.classList.remove('active'));
-    container.querySelector(`.seg-btn[data-val="${type}"]`).classList.add('active');
+    container.querySelector(`.seg-btn[data-val="${type}"]`)?.classList.add('active');
   }
+}
+
+function applyDefaultBotPlayers() {
+  const count = parseInt(document.getElementById('select-count').value || '4');
+  const activeColors = getActivePlayerColors(count);
+  const firstHumanColor = activeColors[0];
+
+  ['red', 'green', 'yellow', 'blue'].forEach(color => {
+    const isActive = activeColors.includes(color);
+    setPlayerTypeUI(color, isActive && color !== firstHumanColor ? 'bot' : 'human');
+  });
+}
+
+window.selectPlayerType = function(color, type) {
+  if (window.synth && typeof window.synth.playToggle === 'function') {
+    window.synth.playToggle();
+  }
+
+  setPlayerTypeUI(color, type);
 };
 
 window.selectPlayerCount = function(count) {
@@ -1807,6 +1829,10 @@ window.selectPlayerCount = function(count) {
   } else {
     allCards.forEach(c => c.style.display = 'flex');
   }
+
+  if (document.getElementById('select-mode').value === 'bot') {
+    applyDefaultBotPlayers();
+  }
 };
 
 window.selectGameMode = function(mode) {
@@ -1827,8 +1853,10 @@ window.selectGameMode = function(mode) {
   const wrappers = document.querySelectorAll('.bot-toggle-wrapper');
   if (mode === 'bot') {
     wrappers.forEach(w => w.style.display = 'flex');
+    applyDefaultBotPlayers();
   } else {
     wrappers.forEach(w => w.style.display = 'none');
+    ['red', 'green', 'yellow', 'blue'].forEach(color => setPlayerTypeUI(color, 'human'));
   }
 };
 
@@ -1845,12 +1873,7 @@ window.startGame = function() {
 
   const playersList = [];
   
-  let colorsToUse = ['red', 'green', 'yellow', 'blue'];
-  if (count === 2) {
-    colorsToUse = ['red', 'yellow'];
-  } else if (count === 3) {
-    colorsToUse = ['red', 'green', 'yellow'];
-  }
+  let colorsToUse = getActivePlayerColors(count);
   
   colorsToUse.forEach(col => {
     const input = document.getElementById(`name-${col}`);
