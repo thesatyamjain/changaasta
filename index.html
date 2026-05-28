@@ -230,6 +230,9 @@
           <button class="btn-icon" id="btn-help" onclick="openRulesGuide()" title="Rules">
             <span>?</span>
           </button>
+          <button class="btn-icon" id="btn-settings" onclick="openSettingsMenu()" title="Settings">
+            <span>⚙️</span>
+          </button>
           <button class="btn-icon" id="btn-mute" onclick="toggleMute()" title="Mute Audio">
             <span id="volume-icon">🔊</span>
           </button>
@@ -268,6 +271,57 @@
       </div>
     </div>
 
+    <!-- SETTINGS OVERLAY -->
+    <div id="settings-overlay" class="hidden">
+      <div class="settings-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="settings-header">
+          <h2 id="settings-title">Settings</h2>
+          <button class="btn-icon" onclick="closeSettingsMenu()" title="Close">x</button>
+        </div>
+        <div class="settings-content">
+          <!-- Theme Setting -->
+          <div class="settings-option-row">
+            <span class="settings-option-label">Theme:</span>
+            <div class="toggle-options" id="settings-theme-container">
+              <button class="btn-toggle active" id="setting-theme-dark" onclick="window.setTheme('dark')">Slate & Gold (Dark)</button>
+              <button class="btn-toggle" id="setting-theme-light" onclick="window.setTheme('light')">Marble & Rose Gold (Light)</button>
+            </div>
+          </div>
+
+          <!-- Volume Control -->
+          <div class="settings-option-row">
+            <span class="settings-option-label">Volume:</span>
+            <div class="settings-slider-container">
+              <input type="range" id="setting-volume" class="settings-slider" min="0" max="100" value="100" oninput="window.setVolume(this.value)">
+              <span id="setting-volume-value" class="settings-slider-value">100%</span>
+            </div>
+          </div>
+
+          <!-- Auto-Roll -->
+          <div class="settings-option-row">
+            <div class="switch-container">
+              <span class="settings-option-label" style="margin: 0;">Auto-Roll Kaudi:</span>
+              <label class="switch">
+                <input type="checkbox" id="setting-auto-roll" onchange="window.setAutoRoll(this.checked)">
+                <span class="slider-switch"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Bot Speed Setting -->
+          <div class="settings-option-row">
+            <span class="settings-option-label">Computer ki Raftaar (Bot Speed):</span>
+            <div class="toggle-options" id="settings-speed-container">
+              <button class="btn-toggle" id="setting-speed-slow" onclick="window.setBotSpeed('slow')">Slow</button>
+              <button class="btn-toggle active" id="setting-speed-normal" onclick="window.setBotSpeed('normal')">Normal</button>
+              <button class="btn-toggle" id="setting-speed-fast" onclick="window.setBotSpeed('fast')">Fast</button>
+              <button class="btn-toggle" id="setting-speed-instant" onclick="window.setBotSpeed('instant')">Instant</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- VICTORY OVERLAY SCREEN -->
     <div id="victory-overlay" class="hidden">
       <div class="victory-card glass-panel">
@@ -287,6 +341,19 @@
         <div style="display: flex; gap: 15px; justify-content: center;">
           <button class="btn-primary" onclick="confirmQuitGame()" style="background: linear-gradient(135deg, #cc0000 0%, #990000 100%); border-color: #ff3333; flex: 1; font-size: 0.9rem; padding: 12px;">HAAN (Yes)</button>
           <button class="btn-primary" onclick="cancelQuitGame()" style="flex: 1; font-size: 0.9rem; padding: 12px;">NAHI (No)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GATTI MOVE CHOICE OVERLAY -->
+    <div id="gatti-choice-overlay" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
+      <div class="victory-card glass-panel" style="max-width: 400px; width: 90%; text-align: center;">
+        <h2 class="victory-title" style="color: var(--gold-chalk); margin-bottom: 10px; font-size: 1.8rem;">GATTI OPTIONS</h2>
+        <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 25px;">Aap is Gatti ko kaise chalna chahte hain?<br><span style="font-size: 0.9rem;">(How do you want to move this Gatti?)</span></p>
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: center; width: 100%;">
+          <button class="btn-primary" id="btn-gatti-group" onclick="window.resolveGattiMove(true)" style="width: 100%; padding: 12px; font-size: 0.95rem;">Dono Gotiyan (Group Move: <span id="gatti-group-steps">0</span> Steps)</button>
+          <button class="btn-primary" id="btn-gatti-single" onclick="window.resolveGattiMove(false)" style="width: 100%; padding: 12px; font-size: 0.95rem;">Ek Goti (Single Move: <span id="gatti-single-steps">0</span> Steps)</button>
+          <button class="btn-toggle" onclick="window.cancelGattiChoice()" style="width: 100%; padding: 10px; margin-top: 5px; font-size: 0.9rem;">CANCEL</button>
         </div>
       </div>
     </div>

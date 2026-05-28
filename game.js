@@ -14,6 +14,7 @@ class SoundSynth {
     this.ctx = null;
     this.muted = false;
     this.rattleInterval = null;
+    this.volume = 1.0;
   }
 
   init() {
@@ -25,12 +26,12 @@ class SoundSynth {
   }
 
   startRattle() {
-    if (this.muted) return;
+    if (this.muted || this.volume <= 0) return;
     this.init();
     if (this.rattleInterval) return;
     
     const playClick = () => {
-      if (this.muted || !this.ctx) return;
+      if (this.muted || !this.ctx || this.volume <= 0) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -38,8 +39,8 @@ class SoundSynth {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(180 + Math.random() * 320, now);
       
-      gain.gain.setValueAtTime(0.05 + Math.random() * 0.04, now);
-      gain.gain.exponentialRampToValueAtTime(0.005, now + 0.05);
+      gain.gain.setValueAtTime((0.05 + Math.random() * 0.04) * this.volume, now);
+      gain.gain.exponentialRampToValueAtTime(0.005 * this.volume, now + 0.05);
       
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -62,7 +63,7 @@ class SoundSynth {
   }
 
   playRoll() {
-    if (this.muted) return;
+    if (this.muted || this.volume <= 0) return;
     this.init();
     
     // Simulate rattling cowrie shells
@@ -74,8 +75,8 @@ class SoundSynth {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(100 + Math.random() * 400, now + i * 0.05);
       
-      gain.gain.setValueAtTime(0.15, now + i * 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.1);
+      gain.gain.setValueAtTime(0.15 * this.volume, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + i * 0.05 + 0.1);
       
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -86,7 +87,7 @@ class SoundSynth {
   }
 
   playMove() {
-    if (this.muted) return;
+    if (this.muted || this.volume <= 0) return;
     this.init();
     
     const now = this.ctx.currentTime;
@@ -97,8 +98,8 @@ class SoundSynth {
     osc.frequency.setValueAtTime(300, now);
     osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
     
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    gain.gain.setValueAtTime(0.1 * this.volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + 0.15);
     
     osc.connect(gain);
     gain.connect(this.ctx.destination);
@@ -108,7 +109,7 @@ class SoundSynth {
   }
 
   playCapture() {
-    if (this.muted) return;
+    if (this.muted || this.volume <= 0) return;
     this.init();
     
     const now = this.ctx.currentTime;
@@ -126,8 +127,8 @@ class SoundSynth {
     osc2.frequency.setValueAtTime(180, now);
     osc2.frequency.linearRampToValueAtTime(30, now + 0.3);
     
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    gain.gain.setValueAtTime(0.3 * this.volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + 0.3);
     
     osc1.connect(gain);
     osc2.connect(gain);
@@ -140,7 +141,7 @@ class SoundSynth {
   }
 
   playWin() {
-    if (this.muted) return;
+    if (this.muted || this.volume <= 0) return;
     this.init();
     
     const now = this.ctx.currentTime;
@@ -153,8 +154,8 @@ class SoundSynth {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now + idx * 0.15);
       
-      gain.gain.setValueAtTime(0.15, now + idx * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.15 + 0.4);
+      gain.gain.setValueAtTime(0.15 * this.volume, now + idx * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + idx * 0.15 + 0.4);
       
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -169,15 +170,15 @@ class SoundSynth {
   }
 
   playToggle() {
-    if (this.muted) return;
+    if (this.muted || this.volume <= 0) return;
     this.init();
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(440, now);
-    gain.gain.setValueAtTime(0.05, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+    gain.gain.setValueAtTime(0.05 * this.volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + 0.08);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start(now);
@@ -402,6 +403,27 @@ function updateResumePanel() {
   panel.classList.toggle('hidden', !getSavedGame());
 }
 
+const SETTINGS_KEY = 'changaAstaSettingsV1';
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(GameState.settings));
+  } catch (error) {
+    console.warn('Unable to save settings', error);
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) {
+      GameState.settings = { ...GameState.settings, ...JSON.parse(raw) };
+    }
+  } catch (error) {
+    console.warn('Unable to load settings', error);
+  }
+}
+
 // Main Game State Object
 const GameState = {
   gridSize: 5,
@@ -413,6 +435,8 @@ const GameState = {
   gamePhase: 'setup', // 'setup', 'rolling', 'moving', 'ended'
   winner: null,
   logs: [],
+  pendingGattiPawn: null,
+  pendingGattiValue: null,
   botDifficulty: 'normal',
   stats: {
     turns: 1,
@@ -426,6 +450,39 @@ const GameState = {
   rules: {
     gattiEnabled: true,
     spawnRequired: false
+  },
+
+  settings: {
+    theme: 'dark',
+    volume: 100,
+    autoRoll: false,
+    botSpeed: 'normal'
+  },
+
+  autoRollTimer: null,
+
+  getBotDelay(type) {
+    const speed = this.settings.botSpeed || 'normal';
+    let baseDelay = 1200;
+    if (type === 'move') baseDelay = 1000;
+    else if (type === 'submove') baseDelay = 300;
+    
+    if (speed === 'slow') return baseDelay * 1.8;
+    if (speed === 'normal') return baseDelay;
+    if (speed === 'fast') return baseDelay * 0.45;
+    if (speed === 'instant') return 50;
+    return baseDelay;
+  },
+
+  triggerAutoRoll() {
+    if (this.autoRollTimer) {
+      clearTimeout(this.autoRollTimer);
+    }
+    this.autoRollTimer = setTimeout(() => {
+      if (this.gamePhase === 'rolling' && !this.getCurrentPlayer().isBot && !this.isRollingAnim && this.settings.autoRoll) {
+        this.rollCowries();
+      }
+    }, 1000);
   },
 
   // Paths database
@@ -489,7 +546,9 @@ const GameState = {
     if (this.getCurrentPlayer().isBot) {
       setTimeout(() => {
         if (this.gamePhase === 'rolling') this.rollCowries();
-      }, 1200);
+      }, this.getBotDelay('roll'));
+    } else if (this.settings.autoRoll) {
+      this.triggerAutoRoll();
     }
     
     // Set initial shell visibility based on board size
@@ -615,6 +674,11 @@ const GameState = {
   // Calculate cowrie rolls
   rollCowries(throwStrength = null) {
     if (this.gamePhase !== 'rolling' || this.isRollingAnim) return;
+
+    if (this.autoRollTimer) {
+      clearTimeout(this.autoRollTimer);
+      this.autoRollTimer = null;
+    }
     
     // Redirect bot rolls to simulateBotChargeAndRoll if no strength is specified
     const player = this.getCurrentPlayer();
@@ -713,7 +777,9 @@ const GameState = {
         if (player.isBot) {
           setTimeout(() => {
             if (this.gamePhase !== 'gameover') this.rollCowries();
-          }, 1200);
+          }, this.getBotDelay('roll'));
+        } else if (this.settings.autoRoll) {
+          this.triggerAutoRoll();
         }
       } else {
         this.rollQueue.push(rollValue);
@@ -730,12 +796,12 @@ const GameState = {
           setTimeout(() => {
             // Guard: don't call endTurn if game ended while timer was pending
             if (this.gamePhase !== 'gameover') this.endTurn();
-          }, 1500);
+          }, this.getBotDelay('roll'));
         } else if (player.isBot) {
           this.saveGame();
           setTimeout(() => {
             if (this.gamePhase === 'moving') this.makeBotMove();
-          }, 1200);
+          }, this.getBotDelay('roll'));
         } else {
           this.saveGame();
         }
@@ -807,7 +873,7 @@ const GameState = {
     });
   },
 
-  isValidPawnMove(pawn, value) {
+  isValidPawnMove(pawn, value, isGroupMove = null) {
     // Yard to board spawn check
     if (pawn.pathIndex === -1) {
       if (this.rules.spawnRequired) {
@@ -818,10 +884,26 @@ const GameState = {
       return true; // Can move directly out on any roll
     }
 
+    if (isGroupMove === null) {
+      if (pawn.isGatti) {
+        const canMoveAsSingle = this.isValidPawnMove(pawn, value, false);
+        const canMoveAsGroup = (value % 2 === 0) && this.isValidPawnMove(pawn, value, true);
+        return canMoveAsSingle || canMoveAsGroup;
+      } else {
+        return this.isValidPawnMove(pawn, value, false);
+      }
+    }
+
+    let steps = value;
+    if (isGroupMove) {
+      if (value % 2 !== 0) return false;
+      steps = value / 2;
+    }
+
     const player = this.getCurrentPlayer();
     const path = this.paths[pawn.color];
     const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
-    let nextIndex = pawn.pathIndex + value;
+    let nextIndex = pawn.pathIndex + steps;
 
     // Apply outer-ring wrap BEFORE the overshoot check, so it matches executeMove behaviour
     if (!player.hasKilled && nextIndex >= firstInnerIndex) {
@@ -834,7 +916,7 @@ const GameState = {
     // Gatti pairing blockade checks
     if (this.rules.gattiEnabled) {
       // Check intermediate path blocks
-      for (let step = 1; step <= value; step++) {
+      for (let step = 1; step <= steps; step++) {
         let idx = pawn.pathIndex + step;
 
         // Wrap around logic if haven't killed
@@ -846,7 +928,7 @@ const GameState = {
         if (idx >= path.length) break;
 
         const cell = path[idx];
-        const isLast = step === value;
+        const isLast = step === steps;
 
         // A Gatti on a safe cell does NOT create a blockade (safe cells are neutral ground)
         if (GameEngine.isSafeCell(this.gridSize, cell.r, cell.c)) continue;
@@ -855,7 +937,7 @@ const GameState = {
         const gattiPawn = this.getOpponentGattiOnCell(cell.r, cell.c, pawn.color);
         if (gattiPawn) {
           // Gatti acts as blockade - cannot land on it or pass it unless landing exactly to cut it with another Gatti
-          if (isLast && pawn.isGatti) {
+          if (isLast && isGroupMove) {
             return true; // Opponent Gatti can be cut by our Gatti landing on it
           }
           return false; // Blocks path
@@ -873,6 +955,14 @@ const GameState = {
       if (gatti) return gatti;
     }
     return null;
+  },
+
+  hasAnyGattiOnCell(r, c) {
+    for (let p of this.players) {
+      const gatti = p.pawns.find(pawn => pawn.isGatti && pawn.pathIndex !== -1 && this.paths[pawn.color][pawn.pathIndex].r === r && this.paths[pawn.color][pawn.pathIndex].c === c);
+      if (gatti) return true;
+    }
+    return false;
   },
 
   hasAnyValidMoves() {
@@ -896,11 +986,32 @@ const GameState = {
 
     if (!this.isValidPawnMove(pawn, value)) return;
 
+    if (this.rules.gattiEnabled && pawn.isGatti && pawn.pathIndex !== -1) {
+      const canMoveSingle = this.isValidPawnMove(pawn, value, false);
+      const canMoveGroup = (value % 2 === 0) && this.isValidPawnMove(pawn, value, true);
+
+      if (canMoveSingle && canMoveGroup) {
+        this.pendingGattiPawn = pawn;
+        this.pendingGattiValue = value;
+        document.getElementById('gatti-group-steps').innerText = value / 2;
+        document.getElementById('gatti-single-steps').innerText = value;
+        document.getElementById('gatti-choice-overlay').classList.remove('hidden');
+        if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+        return;
+      } else if (canMoveGroup) {
+        this.executeMove(pawn, value, true);
+        return;
+      } else if (canMoveSingle) {
+        this.executeMove(pawn, value, false);
+        return;
+      }
+    }
+
     // Execute move immediately upon pawn selection
-    this.executeMove(pawn, value);
+    this.executeMove(pawn, value, false);
   },
 
-  executeMove(pawn, value) {
+  executeMove(pawn, value, isGroupMove = false) {
     synth.playMove();
     const player = this.getCurrentPlayer();
     
@@ -911,7 +1022,8 @@ const GameState = {
     });
 
     let originalPathIndex = pawn.pathIndex;
-    let nextIndex = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + value;
+    let steps = isGroupMove ? (value / 2) : value;
+    let nextIndex = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + steps;
     const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
     
     if (pawn.pathIndex !== -1 && !player.hasKilled && nextIndex >= firstInnerIndex) {
@@ -920,7 +1032,7 @@ const GameState = {
     // Store old DOM rects for WAAPI animation
     this.animatingPawns = [];
     let partner = null;
-    if (pawn.isGatti && originalPathIndex !== -1) {
+    if (pawn.isGatti && originalPathIndex !== -1 && isGroupMove) {
       partner = player.pawns.find(other =>
         other.id !== pawn.id &&
         other.isGatti &&
@@ -943,8 +1055,6 @@ const GameState = {
     // Handle Pawn movement
     pawn.pathIndex = nextIndex;
 
-    // BUG-F guard: only move Gatti partner when not spawning from yard (originalPathIndex=-1
-    // would match other yard pawns with isGatti=true, teleporting them accidentally)
     if (pawn.isGatti && originalPathIndex !== -1) {
       const partner = player.pawns.find(other =>
         other.id !== pawn.id &&
@@ -952,14 +1062,24 @@ const GameState = {
         other.pathIndex === originalPathIndex
       );
       if (partner) {
-        partner.pathIndex = nextIndex;
+        if (isGroupMove) {
+          partner.pathIndex = nextIndex;
+        } else {
+          pawn.isGatti = false;
+          partner.isGatti = false;
+          this.addLog(player.name, `Gatti toot gayi! Ek goti alag ho gayi.`);
+        }
       }
     }
 
     const targetCell = this.paths[pawn.color][nextIndex];
 
     // Logging
-    this.addLog(player.name, `Goti ${pawn.id + 1} ko (${targetCell.r}, ${targetCell.c}) par chalaya`);
+    if (isGroupMove) {
+      this.addLog(player.name, `Gatti ko (${targetCell.r}, ${targetCell.c}) par ${steps} kadam chalaya`);
+    } else {
+      this.addLog(player.name, `Goti ${pawn.id + 1} ko (${targetCell.r}, ${targetCell.c}) par ${steps} kadam chalaya`);
+    }
     this.stats.moves++;
 
     // BUG-B: Clear isGatti when a pawn reaches the final goal cell
@@ -997,12 +1117,9 @@ const GameState = {
     let extraRollGained = false;
 
     if (!isSafe) {
-      // Check if there is an opponent pawn on this cell
       this.players.forEach((opp, oppIdx) => {
         if (oppIdx === this.currentPlayerIndex) return;
 
-        // BUG-A fix: use a flag so we break after the first confirmed capture per opponent
-        // (prevents double-capture sound/extraRoll when Gatti rule is OFF and 2 singles share a cell)
         let capturedThisOpp = false;
         for (const oppPawn of opp.pawns) {
           if (capturedThisOpp) break;
@@ -1011,14 +1128,21 @@ const GameState = {
           const oppCell = this.paths[oppPawn.color][oppPawn.pathIndex];
           if (oppCell.r === targetCell.r && oppCell.c === targetCell.c) {
 
-            // If Gatti rule is enabled, single pawn cannot cut Gatti
-            if (this.rules.gattiEnabled && oppPawn.isGatti && !pawn.isGatti) {
-              continue; // Cannot capture — skip this pawn
+            // Rules check:
+            if (this.rules.gattiEnabled) {
+              if (isGroupMove && !oppPawn.isGatti) {
+                continue; // Gatti cannot capture single pawn
+              }
+              if (!isGroupMove && oppPawn.isGatti) {
+                continue; // Single pawn cannot capture Gatti
+              }
+              if (!isGroupMove && !oppPawn.isGatti && this.hasAnyGattiOnCell(targetCell.r, targetCell.c)) {
+                continue; // Single pawn cannot capture single pawn if there is a Gatti on the cell (shielded)
+              }
             }
 
             // Capture event!
             synth.playCapture();
-            // Reset captured pawn — and its Gatti partner — to yard
             const wasGatti = oppPawn.isGatti;
             if (wasGatti) {
               const gattiPartner = opp.pawns.find(pp =>
@@ -1044,7 +1168,6 @@ const GameState = {
             this.addLog(player.name, `${opp.name} ki goti kaat di! Andar jane ka rasta khul gaya.`);
             showToast(`${player.name} captured ${opp.name}`, 'good');
 
-            // Trigger ripple particles on UI
             this.triggerCaptureEffects(targetCell.r, targetCell.c, opp.color);
           }
         }
@@ -1077,7 +1200,9 @@ const GameState = {
       if (player.isBot) {
         setTimeout(() => {
           if (this.gamePhase === 'rolling') this.rollCowries();
-        }, 1200);
+        }, this.getBotDelay('roll'));
+      } else if (this.settings.autoRoll) {
+        this.triggerAutoRoll();
       }
       return;
     }
@@ -1094,12 +1219,12 @@ const GameState = {
         this.saveGame();
         setTimeout(() => {
           if (this.gamePhase === 'moving') this.endTurn();
-        }, 1200);
+        }, this.getBotDelay('roll'));
       } else if (player.isBot) {
         this.saveGame();
         setTimeout(() => {
           if (this.gamePhase === 'moving') this.makeBotMove();
-        }, 1000);
+        }, this.getBotDelay('move'));
       } else {
         this.saveGame();
       }
@@ -1133,7 +1258,9 @@ const GameState = {
     if (nextPlayer.isBot) {
       setTimeout(() => {
         if (this.gamePhase === 'rolling') this.rollCowries();
-      }, 1200);
+      }, this.getBotDelay('roll'));
+    } else if (this.settings.autoRoll) {
+      this.triggerAutoRoll();
     }
   },
 
@@ -1295,8 +1422,22 @@ const GameState = {
       return null;
     };
 
+    const hasAnyGattiOnCellSim = (simState, r, c) => {
+      const myGatti = simState.pawns.find(p => p.isGatti && p.pathIndex !== -1 && this.paths[player.color][p.pathIndex].r === r && this.paths[player.color][p.pathIndex].c === c);
+      if (myGatti) return true;
+      for (let opp of simState.opponents) {
+        const oppPath = this.paths[opp.color];
+        const gatti = opp.pawns.find(oppP => 
+          oppP.isGatti && oppP.pathIndex !== -1 &&
+          oppPath[oppP.pathIndex].r === r && oppPath[oppP.pathIndex].c === c
+        );
+        if (gatti) return true;
+      }
+      return false;
+    };
+
     // Simulated validity check
-    const isValidPawnMoveSim = (simState, pawn, value) => {
+    const isValidPawnMoveSim = (simState, pawn, value, isGroupMove = null) => {
       if (pawn.pathIndex === -1) {
         if (this.rules.spawnRequired) {
           const isSpawnRoll = this.gridSize === 5 ? (value === 4 || value === 8) : (value === 6 || value === 12);
@@ -1305,37 +1446,48 @@ const GameState = {
         return true;
       }
 
-      let nextIndex = pawn.pathIndex + value;
+      if (isGroupMove === null) {
+        if (pawn.isGatti) {
+          const canMoveAsSingle = isValidPawnMoveSim(simState, pawn, value, false);
+          const canMoveAsGroup = (value % 2 === 0) && isValidPawnMoveSim(simState, pawn, value, true);
+          return canMoveAsSingle || canMoveAsGroup;
+        } else {
+          return isValidPawnMoveSim(simState, pawn, value, false);
+        }
+      }
 
-      // Apply outer-ring wrap BEFORE overshoot check — matches simulateMove behaviour
+      let steps = value;
+      if (isGroupMove) {
+        if (value % 2 !== 0) return false;
+        steps = value / 2;
+      }
+
+      let nextIndex = pawn.pathIndex + steps;
+
       if (!simState.hasKilled && nextIndex >= firstInnerIndex) {
         nextIndex = nextIndex % firstInnerIndex;
       }
 
       const path = this.paths[player.color];
 
-      // Always block overshooting after wrap is applied
       if (nextIndex >= path.length) return false;
 
       if (this.rules.gattiEnabled) {
-        for (let step = 1; step <= value; step++) {
+        for (let step = 1; step <= steps; step++) {
           let idx = pawn.pathIndex + step;
           if (!simState.hasKilled && idx >= firstInnerIndex) {
             idx = idx % firstInnerIndex;
           }
-
-          // Bounds guard: intermediate step must not exceed path array
           if (idx >= path.length) break;
 
           const cell = path[idx];
-          const isLast = step === value;
+          const isLast = step === steps;
 
-          // A Gatti on a safe cell does NOT create a blockade
           if (GameEngine.isSafeCell(this.gridSize, cell.r, cell.c)) continue;
 
           const oppGatti = getOpponentGattiOnCellSim(simState, cell.r, cell.c);
           if (oppGatti) {
-            if (isLast && pawn.isGatti) return true; // Can land on Gatti with Gatti
+            if (isLast && isGroupMove) return true; // Can land on Gatti with Gatti
             return false; // Blocked
           }
         }
@@ -1344,7 +1496,7 @@ const GameState = {
     };
 
     // Simulated move execution
-    const simulateMove = (simState, pawnId, value) => {
+    const simulateMove = (simState, pawnId, value, isGroupMove = false) => {
       const nextState = {
         pawns: simState.pawns.map(p => ({ ...p })),
         hasKilled: simState.hasKilled,
@@ -1357,19 +1509,26 @@ const GameState = {
       const pawn = nextState.pawns.find(p => p.id === pawnId);
       const originalPathIndex = pawn.pathIndex;
       
-      let nextIndex = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + value;
+      let steps = isGroupMove ? (value / 2) : value;
+      let nextIndex = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + steps;
       if (pawn.pathIndex !== -1 && !nextState.hasKilled && nextIndex >= firstInnerIndex) {
         nextIndex = nextIndex % firstInnerIndex;
       }
 
-      // Move the pawn (and its partner if Gatti)
-      // Guard: only move partner when not spawning from yard (originalPathIndex=-1 would match yard pawns)
       pawn.pathIndex = nextIndex;
+
       if (pawn.isGatti && originalPathIndex !== -1) {
         const partner = nextState.pawns.find(other =>
           other.id !== pawn.id && other.isGatti && other.pathIndex === originalPathIndex
         );
-        if (partner) partner.pathIndex = nextIndex;
+        if (partner) {
+          if (isGroupMove) {
+            partner.pathIndex = nextIndex;
+          } else {
+            pawn.isGatti = false;
+            partner.isGatti = false;
+          }
+        }
       }
 
       // Clear isGatti when a pawn reaches the final goal cell
@@ -1387,7 +1546,7 @@ const GameState = {
       const isSafe = GameEngine.isSafeCell(this.gridSize, targetCell.r, targetCell.c);
       let captureOccurred = false;
 
-      // Handle captures — break after first capture per opponent (mirrors executeMove fix)
+      // Handle captures
       if (!isSafe) {
         nextState.opponents.forEach(opp => {
           const oppPath = this.paths[opp.color];
@@ -1397,10 +1556,11 @@ const GameState = {
             if (oppP.pathIndex === -1) continue;
             const oppCell = oppPath[oppP.pathIndex];
             if (oppCell.r === targetCell.r && oppCell.c === targetCell.c) {
-              if (this.rules.gattiEnabled && oppP.isGatti && !pawn.isGatti) {
-                continue; // Cannot capture Gatti with single
+              if (this.rules.gattiEnabled) {
+                if (isGroupMove && !oppP.isGatti) continue;
+                if (!isGroupMove && oppP.isGatti) continue;
+                if (!isGroupMove && !oppP.isGatti && hasAnyGattiOnCellSim(nextState, targetCell.r, targetCell.c)) continue;
               }
-              // Reset captured pawn — and its Gatti partner — to yard
               const wasGattiSim = oppP.isGatti;
               if (wasGattiSim) {
                 const simPartner = opp.pawns.find(pp =>
@@ -1445,30 +1605,25 @@ const GameState = {
       
       simState.pawns.forEach(pawn => {
         if (pawn.pathIndex === goalIndex) {
-          score += 1500; // Finished goal is top priority
+          score += 1500;
         } else if (pawn.pathIndex === -1) {
           score += 0;
         } else {
-          // Goal progression
           if (simState.hasKilled) {
             score += pawn.pathIndex * 35;
           } else {
-            // Encourage moving forward to chase or hunt opponents
             score += pawn.pathIndex * 15;
           }
 
-          // Safety house
           const cell = this.paths[player.color][pawn.pathIndex];
           if (GameEngine.isSafeCell(this.gridSize, cell.r, cell.c)) {
             score += 250;
           }
 
-          // Gatti blockade bonus
           if (this.rules.gattiEnabled && pawn.isGatti) {
             score += 450;
           }
 
-          // Danger checks: check if any opponent can hit us
           simState.opponents.forEach(opp => {
             const oppPath = this.paths[opp.color];
             opp.pawns.forEach(oppP => {
@@ -1506,28 +1661,40 @@ const GameState = {
       let bestScore = -Infinity;
       let bestSeq = [];
 
-      // Try using each roll in the remaining queue
       for (let i = 0; i < remainingRolls.length; i++) {
         const value = remainingRolls[i];
         
         simState.pawns.forEach(pawn => {
-          if (!isValidPawnMoveSim(simState, pawn, value)) return;
-          
-          const { nextState, captureOccurred } = simulateMove(simState, pawn.id, value);
-          const nextRolls = remainingRolls.filter((_, idx) => idx !== i);
-          
-          const result = searchBestSequence(nextState, nextRolls);
-          const score = result.score + (captureOccurred ? 1800 : 0); // Capture bonus in transition
-          
-          if (score > bestScore) {
-            bestScore = score;
-            bestSeq = [{ pawnId: pawn.id, value: value, rollIdx: i }].concat(result.sequence);
+          const options = [];
+          if (pawn.isGatti) {
+            if (isValidPawnMoveSim(simState, pawn, value, false)) {
+              options.push({ isGroupMove: false });
+            }
+            if ((value % 2 === 0) && isValidPawnMoveSim(simState, pawn, value, true)) {
+              options.push({ isGroupMove: true });
+            }
+          } else {
+            if (isValidPawnMoveSim(simState, pawn, value, false)) {
+              options.push({ isGroupMove: false });
+            }
           }
+
+          options.forEach(opt => {
+            const { nextState, captureOccurred } = simulateMove(simState, pawn.id, value, opt.isGroupMove);
+            const nextRolls = remainingRolls.filter((_, idx) => idx !== i);
+            
+            const result = searchBestSequence(nextState, nextRolls);
+            const score = result.score + (captureOccurred ? 1800 : 0);
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestSeq = [{ pawnId: pawn.id, value: value, rollIdx: i, isGroupMove: opt.isGroupMove }].concat(result.sequence);
+            }
+          });
         });
       }
 
       if (bestScore === -Infinity) {
-        // No moves possible with any of the rolls
         return { score: evaluateSimState(simState), sequence: [] };
       }
 
@@ -1542,8 +1709,19 @@ const GameState = {
       this.rollQueue.forEach((value, rollIdx) => {
         player.pawns.forEach(pawn => {
           const simPawn = initialSimState.pawns.find(p => p.id === pawn.id);
-          if (simPawn && isValidPawnMoveSim(initialSimState, simPawn, value)) {
-            legalMoves.push({ pawnId: pawn.id, value, rollIdx });
+          if (simPawn) {
+            if (simPawn.isGatti) {
+              if (isValidPawnMoveSim(initialSimState, simPawn, value, false)) {
+                legalMoves.push({ pawnId: pawn.id, value, rollIdx, isGroupMove: false });
+              }
+              if ((value % 2 === 0) && isValidPawnMoveSim(initialSimState, simPawn, value, true)) {
+                legalMoves.push({ pawnId: pawn.id, value, rollIdx, isGroupMove: true });
+              }
+            } else {
+              if (isValidPawnMoveSim(initialSimState, simPawn, value, false)) {
+                legalMoves.push({ pawnId: pawn.id, value, rollIdx, isGroupMove: false });
+              }
+            }
           }
         });
       });
@@ -1556,9 +1734,9 @@ const GameState = {
           this.selectedRollIndex = chosen.rollIdx;
           this.updateRollQueueUI();
           setTimeout(() => {
-            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, chosen.value);
-          }, 300);
-        }, 500);
+            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, chosen.value, chosen.isGroupMove);
+          }, this.getBotDelay('submove'));
+        }, this.getBotDelay('move') / 2);
       } else {
         this.endTurn();
       }
@@ -1570,13 +1748,22 @@ const GameState = {
       let bestScore = -Infinity;
       this.rollQueue.forEach((value, rollIdx) => {
         initialSimState.pawns.forEach(pawn => {
-          if (!isValidPawnMoveSim(initialSimState, pawn, value)) return;
-          const { nextState, captureOccurred } = simulateMove(initialSimState, pawn.id, value);
-          const score = evaluateSimState(nextState) + (captureOccurred ? 1200 : 0);
-          if (score > bestScore) {
-            bestScore = score;
-            bestStep = { pawnId: pawn.id, value, rollIdx };
+          const options = [];
+          if (pawn.isGatti) {
+            if (isValidPawnMoveSim(initialSimState, pawn, value, false)) options.push(false);
+            if ((value % 2 === 0) && isValidPawnMoveSim(initialSimState, pawn, value, true)) options.push(true);
+          } else {
+            if (isValidPawnMoveSim(initialSimState, pawn, value, false)) options.push(false);
           }
+          
+          options.forEach(isGroupMove => {
+            const { nextState, captureOccurred } = simulateMove(initialSimState, pawn.id, value, isGroupMove);
+            const score = evaluateSimState(nextState) + (captureOccurred ? 1200 : 0);
+            if (score > bestScore) {
+              bestScore = score;
+              bestStep = { pawnId: pawn.id, value, rollIdx, isGroupMove };
+            }
+          });
         });
       });
 
@@ -1587,9 +1774,9 @@ const GameState = {
           this.selectedRollIndex = bestStep.rollIdx;
           this.updateRollQueueUI();
           setTimeout(() => {
-            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, bestStep.value);
-          }, 300);
-        }, 500);
+            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, bestStep.value, bestStep.isGroupMove);
+          }, this.getBotDelay('submove'));
+        }, this.getBotDelay('move') / 2);
       } else {
         this.endTurn();
       }
@@ -1603,19 +1790,17 @@ const GameState = {
       const pawnToMove = player.pawns.find(p => p.id === bestStep.pawnId);
       
       const val = bestStep.value;
-      // Use the exact tracked roll index — indexOf() fails for duplicate values
       const actualIdx = bestStep.rollIdx;
 
       if (actualIdx !== -1) {
         setTimeout(() => {
-          // Guard: verify game is still in moving phase before executing
           if (this.gamePhase !== 'moving') return;
           this.selectedRollIndex = actualIdx;
-          this.updateRollQueueUI(); // Visual highlight
+          this.updateRollQueueUI();
           setTimeout(() => {
-            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, val);
-          }, 300);
-        }, 500);
+            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, val, bestStep.isGroupMove);
+          }, this.getBotDelay('submove'));
+        }, this.getBotDelay('move') / 2);
       } else {
         this.endTurn();
       }
@@ -1982,10 +2167,103 @@ window.rollDice = function() {
 
 window.toggleMute = function() {
   synth.muted = !synth.muted;
-  const volIcon = document.getElementById('volume-icon');
-  if (volIcon) {
-    volIcon.innerText = synth.muted ? '🔇' : '🔊';
+  const volVal = synth.muted ? 0 : (GameState.settings.volume || 100);
+  if (volVal === 0 && !synth.muted) {
+    window.setVolume(100);
+  } else {
+    window.setVolume(volVal);
   }
+};
+
+window.setTheme = function(theme) {
+  GameState.settings.theme = theme;
+  saveSettings();
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+  const btnDark = document.getElementById('setting-theme-dark');
+  const btnLight = document.getElementById('setting-theme-light');
+  if (btnDark && btnLight) {
+    btnDark.classList.toggle('active', theme === 'dark');
+    btnLight.classList.toggle('active', theme === 'light');
+  }
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.setVolume = function(val) {
+  const volume = parseInt(val);
+  GameState.settings.volume = volume;
+  saveSettings();
+  synth.volume = volume / 100;
+  synth.muted = (volume === 0);
+  const slider = document.getElementById('setting-volume');
+  const text = document.getElementById('setting-volume-value');
+  const volIcon = document.getElementById('volume-icon');
+  if (slider) slider.value = volume;
+  if (text) text.innerText = `${volume}%`;
+  if (volIcon) {
+    volIcon.innerText = (volume === 0) ? '🔇' : '🔊';
+  }
+};
+
+window.setAutoRoll = function(enabled) {
+  GameState.settings.autoRoll = enabled;
+  saveSettings();
+  const checkbox = document.getElementById('setting-auto-roll');
+  if (checkbox) checkbox.checked = enabled;
+  if (enabled && GameState.gamePhase === 'rolling' && !GameState.getCurrentPlayer().isBot && !GameState.isRollingAnim) {
+    GameState.triggerAutoRoll();
+  }
+};
+
+window.setBotSpeed = function(speed) {
+  GameState.settings.botSpeed = speed;
+  saveSettings();
+  const speeds = ['slow', 'normal', 'fast', 'instant'];
+  speeds.forEach(s => {
+    const btn = document.getElementById(`setting-speed-${s}`);
+    if (btn) btn.classList.toggle('active', s === speed);
+  });
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.openSettingsMenu = function() {
+  const overlay = document.getElementById('settings-overlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    const s = GameState.settings;
+    window.setTheme(s.theme || 'dark');
+    window.setVolume(s.volume !== undefined ? s.volume : 100);
+    window.setAutoRoll(!!s.autoRoll);
+    window.setBotSpeed(s.botSpeed || 'normal');
+  }
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.closeSettingsMenu = function() {
+  const overlay = document.getElementById('settings-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.resolveGattiMove = function(isGroupMove) {
+  const pawn = GameState.pendingGattiPawn;
+  const value = GameState.pendingGattiValue;
+  document.getElementById('gatti-choice-overlay').classList.add('hidden');
+  GameState.pendingGattiPawn = null;
+  GameState.pendingGattiValue = null;
+  if (pawn && value !== undefined) {
+    GameState.executeMove(pawn, value, isGroupMove);
+  }
+};
+
+window.cancelGattiChoice = function() {
+  document.getElementById('gatti-choice-overlay').classList.add('hidden');
+  GameState.pendingGattiPawn = null;
+  GameState.pendingGattiValue = null;
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
 };
 
 window.openRulesGuide = function() {
@@ -2210,6 +2488,18 @@ window.startGame = function() {
 
 // DOM init scripts for toggle buttons
 document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  const s = GameState.settings;
+  if (s.theme === 'light') {
+    document.body.classList.add('light-theme');
+  }
+  synth.volume = (s.volume !== undefined ? s.volume : 100) / 100;
+  synth.muted = (s.volume === 0);
+  const volIcon = document.getElementById('volume-icon');
+  if (volIcon) {
+    volIcon.innerText = synth.muted ? '🔇' : '🔊';
+  }
+
   updateResumePanel();
 
   const rulesOverlay = document.getElementById('rules-overlay');
@@ -2219,8 +2509,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const settingsOverlay = document.getElementById('settings-overlay');
+  if (settingsOverlay) {
+    settingsOverlay.addEventListener('click', (event) => {
+      if (event.target === settingsOverlay) window.closeSettingsMenu();
+    });
+  }
+
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') window.closeRulesGuide();
+    if (event.key === 'Escape') {
+      window.closeRulesGuide();
+      window.closeSettingsMenu();
+    }
   });
 
   // Handle mobile hardware back button
