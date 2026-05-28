@@ -20,6 +20,8 @@
   <meta name="twitter:image" content="https://changaasta.pages.dev/preview.png">
   <meta name="theme-color" content="#0b110e">
 
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="preview.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -65,6 +67,17 @@
             <button class="btn-toggle" data-val="bot" onclick="window.selectGameMode('bot')">Vs Computer</button>
           </div>
           <input type="hidden" id="select-mode" data-value="local">
+        </div>
+
+        <!-- Bot Difficulty -->
+        <div class="settings-group settings-difficulty slide-up delay-4 hidden" id="difficulty-group">
+          <span class="settings-label">Computer Level:</span>
+          <div class="toggle-options" id="toggle-difficulty-container">
+            <button class="btn-toggle" data-val="easy" onclick="window.selectBotDifficulty('easy')">Easy</button>
+            <button class="btn-toggle active" data-val="normal" onclick="window.selectBotDifficulty('normal')">Normal</button>
+            <button class="btn-toggle" data-val="smart" onclick="window.selectBotDifficulty('smart')">Smart</button>
+          </div>
+          <input type="hidden" id="select-difficulty" value="normal">
         </div>
 
         <!-- PLAYER ROSTER -->
@@ -141,6 +154,10 @@
       <div class="slide-up delay-6" style="display: flex; justify-content: center; width: 100%;">
         <button class="btn-primary" onclick="window.startGame()" style="width: 100%; max-width: 320px; padding: 15px 30px;">KHEL SHURU KAREIN</button>
       </div>
+      <div id="resume-panel" class="resume-panel hidden">
+        <button class="btn-primary" onclick="window.resumeSavedGame()">Continue Saved Game</button>
+        <button class="btn-toggle" onclick="window.clearSavedGame()">Clear Save</button>
+      </div>
     </div>
 
     <!-- MAIN GAMEPLAY SCREEN -->
@@ -210,6 +227,9 @@
 
         <!-- Utilities -->
         <div class="utility-controls glass-panel">
+          <button class="btn-icon" id="btn-help" onclick="openRulesGuide()" title="Rules">
+            <span>?</span>
+          </button>
           <button class="btn-icon" id="btn-mute" onclick="toggleMute()" title="Mute Audio">
             <span id="volume-icon">🔊</span>
           </button>
@@ -219,19 +239,58 @@
       </div>
     </div>
 
+    <!-- RULES GUIDE OVERLAY -->
+    <div id="rules-overlay" class="hidden">
+      <div class="rules-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+        <div class="rules-header">
+          <h2 id="rules-title">Niyam</h2>
+          <button class="btn-icon" onclick="closeRulesGuide()" title="Close">x</button>
+        </div>
+        <div class="rules-grid">
+          <div>
+            <h3>Kaudi</h3>
+            <p>5x5 board uses 4 kaudis: 1, 2, 3, 4, or 8. Rolling 4 or 8 gives another roll.</p>
+            <p>7x7 board uses 6 kaudis: 1, 2, 3, 4, 5, 6, or 12. Rolling 6 or 12 gives another roll.</p>
+          </div>
+          <div>
+            <h3>Capture</h3>
+            <p>Land on an opponent on a non-safe square to send that pawn back to yard. After one capture, your path can enter the inner ring.</p>
+          </div>
+          <div>
+            <h3>Safe Squares</h3>
+            <p>Start squares and the center are safe. Pawns on safe squares cannot be captured.</p>
+          </div>
+          <div>
+            <h3>Gatti</h3>
+            <p>Two same-color pawns on one non-goal square form a Gatti. It blocks opponents when the rule is enabled.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- VICTORY OVERLAY SCREEN -->
     <div id="victory-overlay" class="hidden">
       <div class="victory-card glass-panel">
         <h2 class="victory-title">JEET!</h2>
         <div id="victory-banner" class="winner-banner">Khiladi Jeet Gaya!</div>
         <p style="color: var(--text-muted);">Sabhi 4 gotiyan center (Ghar) pahunch gayi!</p>
+        <div id="victory-stats" class="victory-stats"></div>
         <button class="btn-primary" onclick="restartGame()" style="margin-top: 15px;">FIR SE KHELEIN</button>
       </div>
     </div>
 
   </div>
 
+  <div id="toast-host" class="toast-host"></div>
+
   <script src="game.js"></script>
   <script src="favicon.js"></script>
+  <script>
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,0 +1,19 @@
+{
+  "name": "Changa Asta",
+  "short_name": "Changa Asta",
+  "description": "Play Changa Asta, also known as Chowka Bara or Ashta Chamma.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0b110e",
+  "theme_color": "#0b110e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,120 +1,116 @@
-# 👑 Changa Asta (Chowka Bara / Ashta Chamma)
+# Changa Asta
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![HTML5](https://img.shields.io/badge/HTML5-supported-orange.svg)](#)
 [![CSS3](https://img.shields.io/badge/CSS3-vanilla-blue.svg)](#)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow.svg)](#)
 
-A premium, modern web implementation of the ancient Indian board game **Changa Asta** (also popularly known as *Chowka Bara*, *Ashta Chamma*, *Chakka*, *Katte Mane*, or *Gatta Mane*). This digital adaptation features a majestic **Royal Gold & Slate** aesthetic, rich glassmorphic styling, Web Audio API sound synthesis, and an evaluation-based smart AI bot.
+A polished vanilla-web implementation of **Changa Asta**, also known as **Chowka Bara**, **Ashta Chamma**, **Chakka**, **Katte Mane**, or **Gatta Mane**. The game supports local multiplayer, computer opponents, mobile play, offline install, save/resume, rule toggles, animated kaudis, and synthesized audio.
 
 ![Changa Asta Preview](preview.png)
 
----
+## Features
 
-## 📖 About the Game
+- **5x5 and 7x7 boards**
+  - 5x5 uses 4 kaudis with roll values `1`, `2`, `3`, `4`, and `8`.
+  - 7x7 uses 6 kaudis with roll values `1`, `2`, `3`, `4`, `5`, `6`, and `12`.
+- **Pass & Play**
+  - Play locally with 2, 3, or 4 players on one device.
+- **Vs Computer**
+  - Computer mode defaults to one human player and the remaining active players as bots.
+  - Bot difficulty levels: Easy, Normal, and Smart.
+- **Custom rules**
+  - Gatti blockades.
+  - Optional spawn requirement on high rolls.
+- **Game feel**
+  - Animated kaudi toss area with power meter.
+  - Web Audio API sound effects.
+  - Turn/result toast messages.
+  - Move previews and highlighted valid pawns.
+  - Capture effects and victory stats.
+- **Persistence and install**
+  - Save/resume using `localStorage`.
+  - PWA manifest and service worker for install/offline play when served over HTTP.
+- **Responsive UI**
+  - Desktop board with side panels.
+  - Mobile-first gameplay controls and centered board layout.
 
-Changa Asta is a classic race game for 2 to 4 players, dating back thousands of years. Players roll cowrie shells (*kaudi*) to move their four pawns along a spiral grid, starting from their respective yards, navigating the outer ring, moving into the inner ring, and finally reaching the center home (*Ghar*). 
+## Project Structure
 
-The game combines luck (probability of rolling shells) with tactical decisions (blocking opponents, creating barriers, and safety square management).
+- [index.html](index.html): App markup, setup screen, game screen, overlays, and PWA registration.
+- [styles.css](styles.css): Visual system, board layout, responsive UI, overlays, and animations.
+- [game.js](game.js): Game engine, state machine, bot logic, rendering, save/resume, and UI handlers.
+- [favicon.js](favicon.js): Procedural animated favicon.
+- [manifest.json](manifest.json): PWA metadata.
+- [sw.js](sw.js): Offline cache service worker.
+- [gen_paths.py](gen_paths.py): Helper script for generating reference coordinate paths.
+- [paths_output.md](paths_output.md): Reference 5x5 coordinate paths.
+- [tests/rules.test.js](tests/rules.test.js): Dependency-free Node sanity tests for board/path rules.
 
----
+## Core Rules
 
-## ✨ Features
+### Movement
 
-- **🎮 Board Configurations:**
-  - **5x5 Grid:** Classic game played with **4 cowrie shells** (possibilities: 1, 2, 3, 4, or 8).
-  - **7x7 Grid:** Extended board played with **6 cowrie shells** (possibilities: 1, 2, 3, 4, 5, 6, or 12).
-- **🤖 Game Modes:**
-  - **Pass & Play (Local Multiplayer):** Game night with friends on a single device (2, 3, or 4 players).
-  - **Vs Computer:** Play against our smart, evaluation-based AI bots. Custom configurations allow blending humans and bots in any combination.
-- **⚙️ Custom Rules Configuration:**
-  - **Gatti Banana (Blockades):** Form a double-pawn blockade (*Gatti*) on a square. Opponents cannot pass or land on your Gatti unless they land exactly on it with their own Gatti!
-  - **Ghar Se Nikalna (Spawn Requirement):** Choose whether pawns require rolling a maximum value (4/8 for 5x5 grid or 6/12 for 7x7 grid) to enter the board.
-- **🎨 Premium Visual & Audio Experience:**
-  - **Royal Aesthetics:** Gold accents, deep charcoal panels, and neon indicators.
-  - **Interactive 3D Shells:** Animated rolling shells with realistic scattering physics.
-  - **Web Audio API Synth:** Pure synthesized sound effects (roll rattle, pawn hop, capturing explosions, and arpeggiated victory theme) with a built-in mute option.
-  - **Responsive Design:** Auto-scaling board layouts designed for desktop screens and mobile tap gestures alike.
-  - **Move Preview:** Hovering over your active pawns dynamically highlights their destination square.
-  - **Logging Console:** A scrollable match logging system (*Khel Ka Vivaran*) detailing all game events.
+Each player starts from a side of the board:
 
----
+- Red: south start
+- Green: west start
+- Yellow: north start
+- Blue: east start
 
-## 🗂️ Project Structure
+Pawns travel around the outer ring. After a player captures at least one opponent pawn, that player may enter the inner path toward the center home square.
 
-The project is built entirely on vanilla web standards (no bulky libraries or compilation steps):
+### Kaudi Rolls
 
-- [index.html](file:///d:/changaasta/index.html): The markup structure of the setup lobby, main game screen, sidebar controls, logging console, and victory overlay.
-- [styles.css](file:///d:/changaasta/styles.css): Complete style declarations containing custom properties (variables), card layouts, grid systems, custom fonts, glassmorphism filters, animations, and responsive media queries.
-- [game.js](file:///d:/changaasta/game.js): The core engine, handling:
-  - `SoundSynth`: Web Audio API sound generator.
-  - `GameEngine`: Mathematical grid generation and path computations.
-  - `GameState`: Finite state machine for tracking turns, roll queues, validity checks, collision logic, and win evaluation.
-  - `Bot Decision Engine`: Multi-factor heuristics rating movement options (captures, safety, distance tracking).
-- [gen_paths.py](file:///d:/changaasta/gen_paths.py): Helper python script for generating player path arrays.
-- [paths_output.md](file:///d:/changaasta/paths_output.md): Reference markdown listing the coordinate sequences for all four players on the 5x5 board.
-- [favicon.js](file:///d:/changaasta/favicon.js): Generates a custom procedural canvas favicon for the page.
+The roll value is based on how many kaudis land mouth-up.
 
----
+| Board | 0 up | 1 up | 2 up | 3 up | 4 up | 5 up | 6 up |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 5x5, 4 kaudis | 4 extra | 1 | 2 | 3 | 8 extra | - | - |
+| 7x7, 6 kaudis | 6 extra | 1 | 2 | 3 | 4 | 5 | 12 extra |
 
-## 🎲 Core Rules & Mechanics
+Rolling a high/extra value grants another roll. Three consecutive high/extra rolls cancel the turn and pass play to the next player.
 
-### Movement Coordinates & Paths
-Every player starts at their home base located on the outer border:
-- 🔴 **South Player:** Starts at `(5, 3)` (Red)
-- 🟢 **West Player:** Starts at `(3, 1)` (Green)
-- 🟡 **North Player:** Starts at `(1, 3)` (Yellow)
-- 🔵 **East Player:** Starts at `(3, 5)` (Blue)
+### Safe Squares
 
-Pawns move in an **anti-clockwise direction** around the outer ring. Once a player successfully captures (cuts) at least one opponent pawn, their path extends into the **clockwise inner ring**, leading straight to the center cell `(3, 3)` (the Goal).
+The center and player start squares are safe. The 7x7 board also marks the inner ring corners as safe.
 
-### Cowrie Shell Rolls (Pasa)
-The roll values are computed by counting how many shells land with their "mouth" facing upwards:
+### Gatti
 
-| Grid Size | 0 Mouths Up | 1 Up | 2 Up | 3 Up | 4 Up | 5 Up | 6 Up |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **5x5 (4 Shells)** | **4** *(extra roll)* | **1** | **2** | **3** | **8** *(extra roll)* | — | — |
-| **7x7 (6 Shells)** | **6** *(extra roll)* | **1** | **2** | **3** | **4** | **5** | **12** *(extra roll)* |
+When enabled, two same-color pawns on the same non-goal square form a Gatti. Opponents cannot pass or land on an opposing Gatti unless they land with their own Gatti.
 
-- **Extra Rolls:** Rolling a maximum value (4/8 or 6/12) grants an immediate extra roll.
-- **Three Strikes Penalty:** Rolling an extra roll three consecutive times cancels all accumulated moves for that turn, passing the play to the next player.
+## Run Locally
 
----
+You can open [index.html](index.html) directly in a browser, but PWA/offline features require an HTTP server.
 
-## 🚀 How to Run Locally
+```bash
+python -m http.server 8000
+```
 
-Since this application is built with vanilla HTML, CSS, and JS, you can run it directly:
+Then open:
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/changaasta.git
-   cd changaasta
-   ```
-2. **Open index.html:**
-   Double click the [index.html](file:///d:/changaasta/index.html) file to run it in any modern browser, or run a local lightweight server:
-   ```bash
-   # Using Python
-   python -m http.server 8000
-   
-   # Using Node.js
-   npm install -g serve
-   serve .
-   ```
-3. Navigate to `http://localhost:8000` (or the respective port) to play!
+```text
+http://localhost:8000
+```
 
----
+## Test
 
-## ⚙️ AI Bot Behavior (Heuristics)
+The project has dependency-free Node tests for core board/path rules.
 
-The computer opponent makes intelligent decisions using a custom evaluation scoring function:
-1. **Kill Priority (1500 pts):** Captures opponent tokens whenever possible.
-2. **Goal Attraction (1000 pts):** Lands directly in the center goal to finalize a pawn's journey.
-3. **Safety Attraction (250 pts):** Prefers landing on cross-marked safe cells.
-4. **Aggression & Spawning (200 pts):** Encourages spawning and moving active tokens forward to hunt down opponents.
-5. **Escape Threat (180 pts):** Detects nearby trailing opponents and moves endangered tokens out of range.
+```bash
+node tests/rules.test.js
+```
 
----
+Or, if you use npm:
 
-## 📝 License
+```bash
+npm test
+```
 
-This project is open-source and licensed under the [MIT License](https://opensource.org/licenses/MIT).
+## Release Notes
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

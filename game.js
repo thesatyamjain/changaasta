@@ -365,6 +365,43 @@ function adjustBoardScale() {
 
 window.addEventListener('resize', adjustBoardScale);
 
+const SAVE_KEY = 'changaAstaSaveV1';
+
+function showToast(message, type = '') {
+  const host = document.getElementById('toast-host');
+  if (!host) return;
+
+  const toast = document.createElement('div');
+  toast.className = `game-toast ${type}`.trim();
+  toast.textContent = message;
+  host.appendChild(toast);
+
+  setTimeout(() => toast.remove(), 2700);
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function getSavedGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn('Unable to read saved game', error);
+    return null;
+  }
+}
+
+function updateResumePanel() {
+  const panel = document.getElementById('resume-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden', !getSavedGame());
+}
+
 // Main Game State Object
 const GameState = {
   gridSize: 5,
@@ -376,6 +413,14 @@ const GameState = {
   gamePhase: 'setup', // 'setup', 'rolling', 'moving', 'ended'
   winner: null,
   logs: [],
+  botDifficulty: 'normal',
+  stats: {
+    turns: 1,
+    rolls: 0,
+    moves: 0,
+    captures: 0,
+    startedAt: null
+  },
   
   // Custom toggles
   rules: {
@@ -386,9 +431,10 @@ const GameState = {
   // Paths database
   paths: {},
 
-  initGame(playersList, size, rules) {
+  initGame(playersList, size, rules, botDifficulty = 'normal') {
     this.gridSize = size;
     this.rules = { ...rules };
+    this.botDifficulty = botDifficulty;
     this.winner = null;
     this.logs = [];
     this.currentPlayerIndex = 0;
@@ -396,6 +442,13 @@ const GameState = {
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
     this.isRollingAnim = false;
+    this.stats = {
+      turns: 1,
+      rolls: 0,
+      moves: 0,
+      captures: 0,
+      startedAt: Date.now()
+    };
     
     // Pre-calculate paths
     const colors = ['red', 'green', 'yellow', 'blue'];
@@ -420,6 +473,7 @@ const GameState = {
         name: p.name,
         color: p.color,
         isBot: p.isBot,
+        botDifficulty: p.botDifficulty || botDifficulty,
         hasKilled: false, // Must be true to enter inner rings
         pawns: pawns
       };
@@ -428,6 +482,8 @@ const GameState = {
     this.gamePhase = 'rolling';
     this.addLog('System', `Khel ${size}x${size} board par shuru ho gaya hai!`);
     this.addLog('System', `Ab ${this.getCurrentPlayer().name} ki baari hai.`);
+    showToast(`${this.getCurrentPlayer().name} ki baari`, 'good');
+    this.saveGame();
     
     // If the first player is a bot, trigger their roll
     if (this.getCurrentPlayer().isBot) {
@@ -473,10 +529,87 @@ const GameState = {
     if (logBox) {
       const item = document.createElement('div');
       item.className = `log-item ${color}`;
-      item.innerHTML = `<strong>${sender}:</strong> ${message}`;
+
+      const senderEl = document.createElement('strong');
+      senderEl.textContent = `${sender}:`;
+      item.appendChild(senderEl);
+      item.appendChild(document.createTextNode(` ${message}`));
+
       logBox.appendChild(item);
       logBox.scrollTop = logBox.scrollHeight;
     }
+  },
+
+  saveGame() {
+    if (this.gamePhase === 'setup') return;
+
+    const payload = {
+      version: 1,
+      savedAt: Date.now(),
+      gridSize: this.gridSize,
+      players: this.players,
+      currentPlayerIndex: this.currentPlayerIndex,
+      rollQueue: this.rollQueue,
+      selectedRollIndex: this.selectedRollIndex,
+      consecutiveHighRolls: this.consecutiveHighRolls,
+      gamePhase: this.gamePhase,
+      rules: this.rules,
+      botDifficulty: this.botDifficulty,
+      stats: this.stats,
+      logs: this.logs.slice(-80)
+    };
+
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      updateResumePanel();
+    } catch (error) {
+      console.warn('Unable to save game', error);
+    }
+  },
+
+  restoreGame(payload) {
+    if (!payload || payload.version !== 1 || !Array.isArray(payload.players)) return false;
+
+    this.gridSize = payload.gridSize || 5;
+    this.players = payload.players;
+    this.currentPlayerIndex = payload.currentPlayerIndex || 0;
+    this.rollQueue = Array.isArray(payload.rollQueue) ? payload.rollQueue : [];
+    this.selectedRollIndex = payload.selectedRollIndex ?? null;
+    this.consecutiveHighRolls = payload.consecutiveHighRolls || 0;
+    this.gamePhase = payload.gamePhase === 'gameover' ? 'setup' : (payload.gamePhase || 'rolling');
+    this.rules = payload.rules || { gattiEnabled: true, spawnRequired: false };
+    this.botDifficulty = payload.botDifficulty || 'normal';
+    this.stats = payload.stats || { turns: 1, rolls: 0, moves: 0, captures: 0, startedAt: Date.now() };
+    this.logs = [];
+    this.winner = null;
+    this.isRollingAnim = false;
+
+    const colors = ['red', 'green', 'yellow', 'blue'];
+    this.paths = {};
+    colors.forEach(col => {
+      this.paths[col] = GameEngine.generatePath(this.gridSize, col);
+    });
+
+    document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('victory-overlay').classList.add('hidden');
+    document.getElementById('game-screen').classList.remove('hidden');
+
+    const logBox = document.getElementById('log-box');
+    if (logBox) logBox.innerHTML = '';
+    (payload.logs || []).forEach(entry => this.addLog(entry.sender, entry.message));
+
+    this.renderBoard();
+    this.updateRollQueueUI();
+    showToast('Saved game resumed', 'good');
+
+    if (this.getCurrentPlayer()?.isBot) {
+      setTimeout(() => {
+        if (this.gamePhase === 'rolling') this.rollCowries();
+        else if (this.gamePhase === 'moving') this.makeBotMove();
+      }, 900);
+    }
+
+    return true;
   },
 
   // Calculate cowrie rolls
@@ -558,18 +691,23 @@ const GameState = {
 
       const player = this.getCurrentPlayer();
       this.addLog(player.name, `Aapko ${rollValue} mila!`);
+      this.stats.rolls++;
+      showToast(`${player.name}: ${rollValue}`, extraRoll ? 'warn' : '');
 
       if (extraRoll) {
         this.consecutiveHighRolls++;
         if (this.consecutiveHighRolls >= 3) {
           // Three strikes penalty
           this.addLog('System', `Lagatar 3 badi sankhya aayi! Baari khatam.`);
-          this.endTurn();
+          showToast('3 high rolls: turn skipped', 'warn');
+          this.saveGame();
+          this.endTurn(true);
           return;
         }
         
         this.rollQueue.push(rollValue);
         this.updateRollQueueUI();
+        this.saveGame();
 
         // Let bot trigger next roll if applicable
         if (player.isBot) {
@@ -587,14 +725,19 @@ const GameState = {
         // Auto check if any valid moves exist
         if (!this.hasAnyValidMoves()) {
           this.addLog('System', `Koi chalne layak goti nahi hai.`);
+          showToast('No valid move', 'warn');
+          this.saveGame();
           setTimeout(() => {
             // Guard: don't call endTurn if game ended while timer was pending
             if (this.gamePhase !== 'gameover') this.endTurn();
           }, 1500);
         } else if (player.isBot) {
+          this.saveGame();
           setTimeout(() => {
             if (this.gamePhase === 'moving') this.makeBotMove();
           }, 1200);
+        } else {
+          this.saveGame();
         }
       }
     }, 600);
@@ -817,6 +960,7 @@ const GameState = {
 
     // Logging
     this.addLog(player.name, `Goti ${pawn.id + 1} ko (${targetCell.r}, ${targetCell.c}) par chalaya`);
+    this.stats.moves++;
 
     // BUG-B: Clear isGatti when a pawn reaches the final goal cell
     const goalIdx = this.paths[pawn.color].length - 1;
@@ -895,8 +1039,10 @@ const GameState = {
             player.hasKilled = true;
             extraRollGained = true;
             capturedThisOpp = true;
+            this.stats.captures++;
 
             this.addLog(player.name, `${opp.name} ki goti kaat di! Andar jane ka rasta khul gaya.`);
+            showToast(`${player.name} captured ${opp.name}`, 'good');
 
             // Trigger ripple particles on UI
             this.triggerCaptureEffects(targetCell.r, targetCell.c, opp.color);
@@ -922,9 +1068,11 @@ const GameState = {
       this.selectedRollIndex = null;
       this.updateRollQueueUI();
       this.addLog('System', `${player.name} ko ek aur mauka mila!`);
+      showToast('Extra roll earned', 'good');
 
       this.renderBoard();
       this.triggerMoveAnimations();
+      this.saveGame();
 
       if (player.isBot) {
         setTimeout(() => {
@@ -942,34 +1090,44 @@ const GameState = {
       this.updateRollQueueUI();
       if (!this.hasAnyValidMoves()) {
         this.addLog('System', `Ab koi chalne layak goti nahi hai.`);
+        showToast('No valid move', 'warn');
+        this.saveGame();
         setTimeout(() => {
           if (this.gamePhase === 'moving') this.endTurn();
         }, 1200);
       } else if (player.isBot) {
+        this.saveGame();
         setTimeout(() => {
           if (this.gamePhase === 'moving') this.makeBotMove();
         }, 1000);
+      } else {
+        this.saveGame();
       }
     } else {
+      this.saveGame();
       this.endTurn();
     }
   },
 
-  endTurn() {
+  endTurn(force = false) {
     // Guard: never advance turn if the game is already over or setup
-    if (this.gamePhase !== 'moving') return;
+    if (!force && this.gamePhase !== 'moving') return;
+    if (this.gamePhase === 'gameover' || this.gamePhase === 'setup') return;
 
     this.rollQueue = [];
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
     this.gamePhase = 'rolling';
+    this.stats.turns++;
 
     this.renderBoard();
     this.updateRollQueueUI();
 
     const nextPlayer = this.getCurrentPlayer();
     this.addLog('System', `Ab ${nextPlayer.name} ki baari hai.`);
+    showToast(`${nextPlayer.name} ki baari`, nextPlayer.isBot ? 'warn' : 'good');
+    this.saveGame();
 
     // Handle bot action
     if (nextPlayer.isBot) {
@@ -988,6 +1146,8 @@ const GameState = {
   triggerVictory(player) {
     this.gamePhase = 'gameover';
     this.winner = player;
+    localStorage.removeItem(SAVE_KEY);
+    updateResumePanel();
     this.addLog('System', `🏆 ${player.name} jeet gaya!`);
     
     synth.playVictory();
@@ -1003,6 +1163,29 @@ const GameState = {
       const desc = document.querySelector('#victory-overlay p');
       if (desc) {
         desc.innerText = `Sabhi ${player.pawns.length} gotiyan center (Ghar) pahunch gayi!`;
+      }
+      const statsBox = document.getElementById('victory-stats');
+      if (statsBox) {
+        const elapsed = this.stats.startedAt ? Date.now() - this.stats.startedAt : 0;
+        const stats = [
+          ['Turns', this.stats.turns],
+          ['Rolls', this.stats.rolls],
+          ['Captures', this.stats.captures],
+          ['Moves', this.stats.moves],
+          ['Time', formatDuration(elapsed)],
+          ['Board', `${this.gridSize}x${this.gridSize}`]
+        ];
+        statsBox.innerHTML = '';
+        stats.forEach(([label, value]) => {
+          const item = document.createElement('div');
+          item.className = 'victory-stat';
+          const valueEl = document.createElement('strong');
+          valueEl.textContent = value;
+          const labelEl = document.createElement('span');
+          labelEl.textContent = label;
+          item.append(valueEl, labelEl);
+          statsBox.appendChild(item);
+        });
       }
     }, 1000);
   },
@@ -1351,7 +1534,68 @@ const GameState = {
       return { score: bestScore, sequence: bestSeq };
     };
 
+    const difficulty = player.botDifficulty || this.botDifficulty || 'normal';
     const initialSimState = getInitialSimState();
+
+    if (difficulty === 'easy') {
+      const legalMoves = [];
+      this.rollQueue.forEach((value, rollIdx) => {
+        player.pawns.forEach(pawn => {
+          const simPawn = initialSimState.pawns.find(p => p.id === pawn.id);
+          if (simPawn && isValidPawnMoveSim(initialSimState, simPawn, value)) {
+            legalMoves.push({ pawnId: pawn.id, value, rollIdx });
+          }
+        });
+      });
+
+      if (legalMoves.length > 0) {
+        const chosen = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+        const pawnToMove = player.pawns.find(p => p.id === chosen.pawnId);
+        setTimeout(() => {
+          if (this.gamePhase !== 'moving') return;
+          this.selectedRollIndex = chosen.rollIdx;
+          this.updateRollQueueUI();
+          setTimeout(() => {
+            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, chosen.value);
+          }, 300);
+        }, 500);
+      } else {
+        this.endTurn();
+      }
+      return;
+    }
+
+    if (difficulty === 'normal') {
+      let bestStep = null;
+      let bestScore = -Infinity;
+      this.rollQueue.forEach((value, rollIdx) => {
+        initialSimState.pawns.forEach(pawn => {
+          if (!isValidPawnMoveSim(initialSimState, pawn, value)) return;
+          const { nextState, captureOccurred } = simulateMove(initialSimState, pawn.id, value);
+          const score = evaluateSimState(nextState) + (captureOccurred ? 1200 : 0);
+          if (score > bestScore) {
+            bestScore = score;
+            bestStep = { pawnId: pawn.id, value, rollIdx };
+          }
+        });
+      });
+
+      if (bestStep) {
+        const pawnToMove = player.pawns.find(p => p.id === bestStep.pawnId);
+        setTimeout(() => {
+          if (this.gamePhase !== 'moving') return;
+          this.selectedRollIndex = bestStep.rollIdx;
+          this.updateRollQueueUI();
+          setTimeout(() => {
+            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, bestStep.value);
+          }, 300);
+        }, 500);
+      } else {
+        this.endTurn();
+      }
+      return;
+    }
+
     const searchResult = searchBestSequence(initialSimState, this.rollQueue);
 
     if (searchResult.sequence.length > 0) {
@@ -1744,8 +1988,38 @@ window.toggleMute = function() {
   }
 };
 
+window.openRulesGuide = function() {
+  const overlay = document.getElementById('rules-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.closeRulesGuide = function() {
+  const overlay = document.getElementById('rules-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.resumeSavedGame = function() {
+  const saved = getSavedGame();
+  if (!saved) {
+    showToast('No saved game found', 'warn');
+    updateResumePanel();
+    return;
+  }
+  GameState.restoreGame(saved);
+};
+
+window.clearSavedGame = function() {
+  localStorage.removeItem(SAVE_KEY);
+  updateResumePanel();
+  showToast('Saved game cleared', 'warn');
+};
+
 window.restartGame = function(fromBackButton = false) {
   GameState.gamePhase = 'setup';
+  localStorage.removeItem(SAVE_KEY);
+  updateResumePanel();
   if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
   document.getElementById('victory-overlay').classList.add('hidden');
   document.getElementById('game-screen').classList.add('hidden');
@@ -1794,6 +2068,19 @@ window.selectPlayerType = function(color, type) {
   }
 
   setPlayerTypeUI(color, type);
+};
+
+window.selectBotDifficulty = function(difficulty) {
+  if (window.synth && typeof window.synth.playToggle === 'function') {
+    window.synth.playToggle();
+  }
+
+  document.getElementById('select-difficulty').value = difficulty;
+  const container = document.getElementById('toggle-difficulty-container');
+  if (container) {
+    container.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+    container.querySelector(`.btn-toggle[data-val="${difficulty}"]`)?.classList.add('active');
+  }
 };
 
 window.selectPlayerCount = function(count) {
@@ -1851,11 +2138,14 @@ window.selectGameMode = function(mode) {
 
   // Show/Hide the individual player bot toggles
   const wrappers = document.querySelectorAll('.bot-toggle-wrapper');
+  const difficultyGroup = document.getElementById('difficulty-group');
   if (mode === 'bot') {
     wrappers.forEach(w => w.style.display = 'flex');
+    difficultyGroup?.classList.remove('hidden');
     applyDefaultBotPlayers();
   } else {
     wrappers.forEach(w => w.style.display = 'none');
+    difficultyGroup?.classList.add('hidden');
     ['red', 'green', 'yellow', 'blue'].forEach(color => setPlayerTypeUI(color, 'human'));
   }
 };
@@ -1865,6 +2155,7 @@ window.startGame = function() {
   const size = parseInt(document.getElementById('select-size').getAttribute('data-value') || '5');
   const count = parseInt(document.getElementById('select-count').value || '4');
   const mode = document.getElementById('select-mode').value || 'local';
+  const botDifficulty = document.getElementById('select-difficulty')?.value || 'normal';
   
   const rules = {
     gattiEnabled: document.getElementById('rule-gatti').classList.contains('active'),
@@ -1882,13 +2173,14 @@ window.startGame = function() {
       playersList.push({
         name: input.value.trim() || `${col.toUpperCase()} Player`,
         color: col,
-        isBot: (mode === 'local') ? false : (botSelect.value === 'bot')
+        isBot: (mode === 'local') ? false : (botSelect.value === 'bot'),
+        botDifficulty
       });
     }
   });
 
   // Init Engine
-  GameState.initGame(playersList, size, rules);
+  GameState.initGame(playersList, size, rules, botDifficulty);
   
   // Transitions
   document.getElementById('setup-screen').classList.add('hidden');
@@ -1903,6 +2195,19 @@ window.startGame = function() {
 
 // DOM init scripts for toggle buttons
 document.addEventListener('DOMContentLoaded', () => {
+  updateResumePanel();
+
+  const rulesOverlay = document.getElementById('rules-overlay');
+  if (rulesOverlay) {
+    rulesOverlay.addEventListener('click', (event) => {
+      if (event.target === rulesOverlay) window.closeRulesGuide();
+    });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') window.closeRulesGuide();
+  });
+
   // Handle mobile hardware back button
   window.addEventListener('popstate', (event) => {
     if (window.isIntentionalRestart) {

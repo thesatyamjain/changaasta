@@ -1,0 +1,11 @@
+{
+  "name": "changa-asta",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vanilla web Changa Asta / Chowka Bara game.",
+  "scripts": {
+    "test": "node tests/rules.test.js",
+    "check": "node --check game.js && node --check sw.js && node tests/rules.test.js"
+  },
+  "license": "MIT"
+}
