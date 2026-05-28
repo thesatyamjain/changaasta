@@ -233,7 +233,7 @@
           <button class="btn-icon" id="btn-mute" onclick="toggleMute()" title="Mute Audio">
             <span id="volume-icon">🔊</span>
           </button>
-          <button class="btn-primary" style="font-size: 0.85rem; padding: 8px 15px;" onclick="restartGame()">Naya Khel</button>
+          <button class="btn-primary" style="font-size: 0.85rem; padding: 8px 15px;" onclick="showQuitWarning()">Naya Khel</button>
         </div>
 
       </div>
@@ -276,6 +276,18 @@
         <p style="color: var(--text-muted);">Sabhi 4 gotiyan center (Ghar) pahunch gayi!</p>
         <div id="victory-stats" class="victory-stats"></div>
         <button class="btn-primary" onclick="restartGame()" style="margin-top: 15px;">FIR SE KHELEIN</button>
+      </div>
+    </div>
+
+    <!-- QUIT WARNING OVERLAY SCREEN -->
+    <div id="quit-overlay" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
+      <div class="victory-card glass-panel" style="max-width: 400px; width: 90%; text-align: center;">
+        <h2 class="victory-title" style="color: #ff4d4d; margin-bottom: 10px; font-size: 2rem;">CHETAVANI</h2>
+        <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 25px;">Kya aap sach mein khel chhodna chahte hain?<br><span style="font-size: 0.9rem;">(Are you sure you want to quit the game?)</span></p>
+        <div style="display: flex; gap: 15px; justify-content: center;">
+          <button class="btn-primary" onclick="confirmQuitGame()" style="background: linear-gradient(135deg, #cc0000 0%, #990000 100%); border-color: #ff3333; flex: 1; font-size: 0.9rem; padding: 12px;">HAAN (Yes)</button>
+          <button class="btn-primary" onclick="cancelQuitGame()" style="flex: 1; font-size: 0.9rem; padding: 12px;">NAHI (No)</button>
+        </div>
       </div>
     </div>
 

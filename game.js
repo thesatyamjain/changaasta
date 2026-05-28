@@ -2016,6 +2016,21 @@ window.clearSavedGame = function() {
   showToast('Saved game cleared', 'warn');
 };
 
+window.showQuitWarning = function() {
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+  document.getElementById('quit-overlay').classList.remove('hidden');
+};
+
+window.confirmQuitGame = function() {
+  document.getElementById('quit-overlay').classList.add('hidden');
+  window.restartGame(); // cleans up state automatically
+};
+
+window.cancelQuitGame = function() {
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+  document.getElementById('quit-overlay').classList.add('hidden');
+};
+
 window.restartGame = function(fromBackButton = false) {
   GameState.gamePhase = 'setup';
   localStorage.removeItem(SAVE_KEY);
@@ -2215,14 +2230,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
+    const quitOverlay = document.getElementById('quit-overlay');
+    if (quitOverlay && !quitOverlay.classList.contains('hidden')) {
+      quitOverlay.classList.add('hidden');
+      history.pushState({ page: 'game' }, '', '#game');
+      return;
+    }
+
     // If the game screen is visible and user clicked back
     if (!document.getElementById('game-screen').classList.contains('hidden')) {
-      if (confirm("Kya aap sach mein khel chhodna chahte hain? (Are you sure you want to quit the game?)")) {
-        window.restartGame(true); // true = called from back button, don't re-trigger history.back()
-      } else {
-        // User cancelled, push state again to stay in game
-        history.pushState({ page: 'game' }, '', '#game');
-      }
+      history.pushState({ page: 'game' }, '', '#game');
+      if (quitOverlay) quitOverlay.classList.remove('hidden');
     }
   });
 

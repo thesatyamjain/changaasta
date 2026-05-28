@@ -1,0 +1,22 @@
+# Node / NPM
+node_modules/
+npm-debug.log
+
+# System Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Python (for gen_paths.py)
+__pycache__/
+*.py[cod]
+*$py.class
