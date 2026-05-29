@@ -586,7 +586,6 @@ const GameState = {
     this.gamePhase = 'rolling';
     this.addLog('System', `Khel ${size}x${size} board par shuru ho gaya hai!`);
     this.addLog('System', `Ab ${this.getCurrentPlayer().name} ki baari hai.`);
-    showToast(`${this.getCurrentPlayer().name} ki baari`, 'good');
     this.saveGame();
     
     // If the first player is a bot, trigger their roll
@@ -1380,7 +1379,6 @@ const GameState = {
 
     const nextPlayer = this.getCurrentPlayer();
     this.addLog('System', `Ab ${nextPlayer.name} ki baari hai.`);
-    showToast(`${nextPlayer.name} ki baari`, nextPlayer.isBot ? 'warn' : 'good');
     this.saveGame();
 
     // Handle bot action
@@ -2971,4 +2969,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup the SOTA click-and-hold/touch-and-hold events for cowrie rolling
   GameState.setupRollButtonEvents();
+  
+  // Initialize the responsive Screen Engine
+  ScreenEngine.init();
 });
+
+// Screen Scaling Engine to guarantee perfect layout fitting on all devices
+const ScreenEngine = {
+  init() {
+    this.update = this.update.bind(this);
+    window.addEventListener('resize', this.update);
+    window.addEventListener('orientationchange', this.update);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', this.update);
+    }
+    this.update();
+    setTimeout(this.update, 100);
+  },
+
+  update() {
+    const vWidth = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+    const vHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+    document.documentElement.style.setProperty('--vw', `${vWidth}px`);
+    document.documentElement.style.setProperty('--vh', `${vHeight}px`);
+
+    let boardSize = 0;
+    
+    if (vWidth <= 850) {
+      // Mobile: Reserve 385px for UI and Yards
+      boardSize = Math.min(vHeight - 385, vWidth * 0.92);
+    } else if (vWidth <= 1200) {
+      // Tablet: Reserve 200px for UI and Yards
+      boardSize = Math.min(vHeight - 200, vWidth * 0.9);
+    } else {
+      // Desktop: Reserve 200px, max 500px wide
+      boardSize = Math.min(vHeight - 200, 500);
+    }
+
+    boardSize = Math.max(250, boardSize); // Minimum bound
+    document.documentElement.style.setProperty('--dynamic-board-size', `${boardSize}px`);
+  }
+};

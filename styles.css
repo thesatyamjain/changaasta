@@ -504,15 +504,15 @@ header p {
 .board-grid.size-5 {
   grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(5, 1fr);
-  width: min(425px, calc(100vh - 320px), 60vw);
-  height: min(425px, calc(100vh - 320px), 60vw);
+  width: var(--dynamic-board-size, min(425px, calc(100vh - 320px), 60vw));
+  height: var(--dynamic-board-size, min(425px, calc(100vh - 320px), 60vw));
 }
 
 .board-grid.size-7 {
   grid-template-columns: repeat(7, 1fr);
   grid-template-rows: repeat(7, 1fr);
-  width: min(455px, calc(100vh - 320px), 60vw);
-  height: min(455px, calc(100vh - 320px), 60vw);
+  width: var(--dynamic-board-size, min(455px, calc(100vh - 320px), 60vw));
+  height: var(--dynamic-board-size, min(455px, calc(100vh - 320px), 60vw));
 }
 
 /* Grid Cells (Basalt Slate Tiles) */
@@ -1216,18 +1216,7 @@ header p {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Match Logs Console */
-.log-title {
-  padding: 14px 18px;
-  font-weight: 700;
-  border-bottom: 1px solid rgba(223, 177, 91, 0.15);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: var(--gold-chalk);
-  text-shadow: 0 0 8px rgba(223, 177, 91, 0.2);
-  font-family: var(--font-heading);
-}
+
 
 .log-content {
   flex: 1;
@@ -1448,11 +1437,7 @@ header p {
     order: 2;
   }
 
-  .sidebar-left {
-    width: 100%;
-    max-width: 550px;
-    order: 3;
-  }
+
 }
 
 #rules-overlay, #settings-overlay, #log-overlay, #quit-overlay, #gatti-choice-overlay {
@@ -1757,8 +1742,8 @@ input:checked + .slider-switch:before {
   }
 
   .board-grid.size-5, .board-grid.size-7 {
-    width: min(92vw, calc(100dvh - 385px));
-    height: min(92vw, calc(100dvh - 385px));
+    width: var(--dynamic-board-size, min(92vw, calc(100dvh - 385px)));
+    height: var(--dynamic-board-size, min(92vw, calc(100dvh - 385px)));
     min-width: 250px;
     min-height: 250px;
   }
@@ -2177,11 +2162,7 @@ body.light-theme .yard-pocket {
     0 8px 20px rgba(0, 0, 0, 0.1),
     0 0 15px rgba(160, 115, 80, 0.15);
 }
-body.light-theme .log-panel {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(160, 115, 80, 0.2);
-  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.04);
-}
+
 body.light-theme .log-item {
   color: #2e3b33;
   border-left-color: rgba(0, 0, 0, 0.15);

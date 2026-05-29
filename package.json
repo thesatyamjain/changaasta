@@ -5,6 +5,7 @@
   "description": "Vanilla web Changa Asta / Chowka Bara game.",
   "scripts": {
     "test": "node tests/rules.test.js",
+    "clean": "node -e \"const fs = require('fs'); ['docs/paths_output.md', 'scripts/__pycache__'].forEach(p => fs.rmSync(p, {recursive: true, force: true}))\"",
     "check": "node --check game.js && node --check sw.js && node tests/rules.test.js"
   },
   "license": "MIT"
