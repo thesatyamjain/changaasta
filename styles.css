@@ -1725,13 +1725,18 @@ input:checked + .slider-switch:before {
 
 
   .board-outer-container {
-    padding: 110px 0 112px 0;
+    position: absolute;
+    top: 55px;
+    bottom: 145px;
+    left: 0;
+    right: 0;
+    padding: 0;
     width: 100vw;
     display: flex;
     justify-content: center;
     align-items: center;
     margin: 0;
-    transform: translateY(-18px);
+    transform: none;
   }
 
   .board-frame {
