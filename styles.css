@@ -982,6 +982,18 @@ header p {
   transform: scale(1.1);
 }
 
+.roll-score-slot.used {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.25) !important;
+  text-decoration: line-through;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  animation: none !important;
+  transform: none !important;
+  opacity: 0.55;
+}
+
 /* Roll Shells Section */
 .roll-panel {
   padding: 20px;
@@ -1718,7 +1730,9 @@ input:checked + .slider-switch:before {
     margin: 0;
     align-items: center;
     width: 100vw;
-    min-height: auto;
+    height: 100dvh;
+    position: relative;
+    overflow: hidden;
     justify-content: flex-start;
   }
 
@@ -2429,6 +2443,12 @@ body.light-theme .roll-score-slot.selected {
     0 0 18px rgba(255, 208, 43, 0.6),
     inset 0 1px 2px rgba(255, 255, 255, 0.55);
   transform: scale(1.1);
+}
+
+body.light-theme .roll-score-slot.used {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: rgba(0, 0, 0, 0.25) !important;
 }
 
 body.light-theme .header-logo-canvas {
