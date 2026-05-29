@@ -339,15 +339,17 @@ const GameEngine = {
   },
 
   // Verify if a coordinate cell is safe
-  isSafeCell(gridSize, r, c) {
+  // Track C fix: accepts optional activeColors so 3-player games don't treat Blue start as safe
+  isSafeCell(gridSize, r, c, activeColors = null) {
     const center = Math.ceil(gridSize / 2);
     if (r === center && c === center) return true; // Center Home
     
-    // Starting bases
-    if (r === gridSize && c === center) return true;
-    if (r === center && c === 1) return true;
-    if (r === 1 && c === center) return true;
-    if (r === center && c === gridSize) return true;
+    // Starting bases — only mark as safe if the color is active in this game
+    const colors = activeColors || ['red', 'green', 'yellow', 'blue'];
+    if (colors.includes('red') && r === gridSize && c === center) return true;
+    if (colors.includes('green') && r === center && c === 1) return true;
+    if (colors.includes('yellow') && r === 1 && c === center) return true;
+    if (colors.includes('blue') && r === center && c === gridSize) return true;
     
     // Additional safes for 7x7 board (Corners of Ring 1)
     if (gridSize === 7) {
@@ -357,6 +359,12 @@ const GameEngine = {
     }
     
     return false;
+  },
+
+  // Returns array of active player colors for isSafeCell calls
+  getActiveColors() {
+    if (!window.GameState || !GameState.players) return null;
+    return GameState.players.map(p => p.color);
   }
 };
 
@@ -366,7 +374,8 @@ function adjustBoardScale() {
 
 window.addEventListener('resize', adjustBoardScale);
 
-const SAVE_KEY = 'changaAstaSaveV1';
+const SAVE_KEY = 'changaAstaSaveV2';
+const SAVE_KEY_LEGACY = 'changaAstaSaveV1';
 
 function showToast(message, type = '') {
   const host = document.getElementById('toast-host');
@@ -438,6 +447,7 @@ const GameState = {
   pendingGattiPawn: null,
   pendingGattiValue: null,
   botDifficulty: 'normal',
+  undoSnapshot: null,   // Track C: one-step undo
   stats: {
     turns: 1,
     rolls: 0,
@@ -456,7 +466,8 @@ const GameState = {
     theme: 'dark',
     volume: 100,
     autoRoll: false,
-    botSpeed: 'normal'
+    botSpeed: 'normal',
+    colorBlind: false
   },
 
   autoRollTimer: null,
@@ -488,6 +499,41 @@ const GameState = {
   // Paths database
   paths: {},
 
+  // Track C: Save undo snapshot before a move (human only)
+  saveUndoSnapshot() {
+    this.undoSnapshot = {
+      players: JSON.parse(JSON.stringify(this.players)),
+      currentPlayerIndex: this.currentPlayerIndex,
+      rollQueue: [...this.rollQueue],
+      selectedRollIndex: this.selectedRollIndex,
+      consecutiveHighRolls: this.consecutiveHighRolls,
+      gamePhase: this.gamePhase,
+      stats: { ...this.stats }
+    };
+    const undoBtn = document.getElementById('btn-undo');
+    if (undoBtn) undoBtn.disabled = false;
+  },
+
+  applyUndo() {
+    if (!this.undoSnapshot) return;
+    const snap = this.undoSnapshot;
+    this.players = snap.players;
+    this.currentPlayerIndex = snap.currentPlayerIndex;
+    this.rollQueue = snap.rollQueue;
+    this.selectedRollIndex = snap.selectedRollIndex;
+    this.consecutiveHighRolls = snap.consecutiveHighRolls;
+    this.gamePhase = snap.gamePhase;
+    this.stats = snap.stats;
+    this.undoSnapshot = null;
+    this.isRollingAnim = false;
+    const undoBtn = document.getElementById('btn-undo');
+    if (undoBtn) undoBtn.disabled = true;
+    this.renderBoard();
+    this.updateRollQueueUI();
+    this.saveGame();
+    showToast('Move undone', 'good');
+  },
+
   initGame(playersList, size, rules, botDifficulty = 'normal') {
     this.gridSize = size;
     this.rules = { ...rules };
@@ -498,6 +544,7 @@ const GameState = {
     this.rollQueue = [];
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
+    this.undoSnapshot = null;
     this.isRollingAnim = false;
     this.stats = {
       turns: 1,
@@ -995,6 +1042,21 @@ const GameState = {
         this.pendingGattiValue = value;
         document.getElementById('gatti-group-steps').innerText = value / 2;
         document.getElementById('gatti-single-steps').innerText = value;
+        // Track C: Show destination cell preview in Gatti overlay
+        const groupSteps = value / 2;
+        const singleSteps = value;
+        const path = this.paths[pawn.color];
+        const firstInnerIdx = this.gridSize === 5 ? 16 : 24;
+        const player = this.getCurrentPlayer();
+        const calcDest = (steps) => {
+          let idx = pawn.pathIndex + steps;
+          if (!player.hasKilled && idx >= firstInnerIdx) idx = idx % firstInnerIdx;
+          return idx < path.length ? `(${path[idx].r},${path[idx].c})` : '(Home)';
+        };
+        const groupDestEl = document.getElementById('gatti-group-dest');
+        const singleDestEl = document.getElementById('gatti-single-dest');
+        if (groupDestEl) groupDestEl.textContent = calcDest(groupSteps);
+        if (singleDestEl) singleDestEl.textContent = calcDest(singleSteps);
         document.getElementById('gatti-choice-overlay').classList.remove('hidden');
         if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
         return;
@@ -1013,6 +1075,10 @@ const GameState = {
 
   executeMove(pawn, value, isGroupMove = false) {
     synth.playMove();
+    // Track C: save undo snapshot before executing move (human players only)
+    if (!this.getCurrentPlayer().isBot) {
+      this.saveUndoSnapshot();
+    }
     const player = this.getCurrentPlayer();
     
     // De-register click handlers
@@ -1109,6 +1175,8 @@ const GameState = {
         pawn.isGatti = true;
         partner.isGatti = true;
         this.addLog(player.name, `Gatti ban gayi!`);
+        // Track B: mark for burst animation — applied after render
+        this._gattiNewPawnIds = [pawn.id, partner.id];
       }
     }
 
@@ -1160,10 +1228,16 @@ const GameState = {
             oppPawn.pathIndex = -1;
             oppPawn.isGatti = false;
 
+            const wasFirstKill = !player.hasKilled;
             player.hasKilled = true;
             extraRollGained = true;
             capturedThisOpp = true;
             this.stats.captures++;
+
+            // Track C: flash inner-ring entry indicator on first kill
+            if (wasFirstKill) {
+              this.flashInnerRingEntry(player);
+            }
 
             this.addLog(player.name, `${opp.name} ki goti kaat di! Andar jane ka rasta khul gaya.`);
             showToast(`${player.name} captured ${opp.name}`, 'good');
@@ -1209,6 +1283,20 @@ const GameState = {
 
     this.renderBoard();
     this.triggerMoveAnimations();
+    // Track B: fire Gatti burst after render
+    if (this._gattiNewPawnIds) {
+      const ids = this._gattiNewPawnIds;
+      this._gattiNewPawnIds = null;
+      requestAnimationFrame(() => {
+        ids.forEach(pid => {
+          const el = document.querySelector(`.pawn[data-player-index="${this.currentPlayerIndex}"][data-pawn-id="${pid}"]`);
+          if (el) {
+            el.classList.add('gatti-new');
+            setTimeout(() => el.classList.remove('gatti-new'), 800);
+          }
+        });
+      });
+    }
 
     // Check next phase
     if (this.rollQueue.length > 0) {
@@ -1242,12 +1330,23 @@ const GameState = {
     this.rollQueue = [];
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
+    this.undoSnapshot = null; // Clear undo on turn end
+    const undoBtn = document.getElementById('btn-undo');
+    if (undoBtn) undoBtn.disabled = true;
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
     this.gamePhase = 'rolling';
     this.stats.turns++;
 
     this.renderBoard();
     this.updateRollQueueUI();
+
+    // Track B: turn-change slide animation
+    const turnIndicator = document.querySelector('.player-turn-indicator');
+    if (turnIndicator) {
+      turnIndicator.classList.remove('turn-change');
+      void turnIndicator.offsetWidth; // force reflow
+      turnIndicator.classList.add('turn-change');
+    }
 
     const nextPlayer = this.getCurrentPlayer();
     this.addLog('System', `Ab ${nextPlayer.name} ki baari hai.`);
@@ -1317,9 +1416,24 @@ const GameState = {
     }, 1000);
   },
 
+  // Track C: Flash the inner-ring entry cell for the player who just unlocked inner access
+  flashInnerRingEntry(player) {
+    const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+    const path = this.paths[player.color];
+    if (!path || path.length <= firstInnerIndex) return;
+    const entryCell = path[firstInnerIndex - 1];
+    const cellEl = document.querySelector(`.cell[data-r="${entryCell.r}"][data-c="${entryCell.c}"]`);
+    if (cellEl) {
+      cellEl.classList.add('inner-ring-flash');
+      showToast(`${player.name}: Inner ring unlocked! 🎯`, 'good');
+      setTimeout(() => cellEl.classList.remove('inner-ring-flash'), 2500);
+    }
+  },
+
   // Apply FLIP animations to pawns that just moved
   triggerMoveAnimations() {
     if (!this.animatingPawns || this.animatingPawns.length === 0) return;
+    const playerColor = this.getCurrentPlayer()?.color;
     
     requestAnimationFrame(() => {
       this.animatingPawns.forEach(anim => {
@@ -1328,6 +1442,11 @@ const GameState = {
           const newRect = newEl.getBoundingClientRect();
           const dx = anim.oldRect.left - newRect.left;
           const dy = anim.oldRect.top - newRect.top;
+          
+          // Track B: spawn trail dot at old position
+          if ((dx !== 0 || dy !== 0) && playerColor) {
+            this.spawnMoveTrail(anim.oldRect, playerColor);
+          }
           
           if (dx !== 0 || dy !== 0) {
             if (typeof newEl.animate === 'function') {
@@ -1346,41 +1465,50 @@ const GameState = {
     });
   },
 
-  // Trigger capture ripple particle animation
+  // Track B: Spawn move trail dot from old pawn position
+  spawnMoveTrail(oldRect, color) {
+    const boardEl = document.getElementById('board');
+    if (!boardEl) return;
+    const boardRect = boardEl.getBoundingClientRect();
+    const dot = document.createElement('div');
+    dot.className = 'move-trail';
+    dot.style.background = `var(--color-${color})`;
+    dot.style.boxShadow = `0 0 8px var(--color-${color})`;
+    dot.style.left = `${oldRect.left - boardRect.left + oldRect.width / 2 - 5}px`;
+    dot.style.top = `${oldRect.top - boardRect.top + oldRect.height / 2 - 5}px`;
+    boardEl.style.position = 'relative';
+    boardEl.appendChild(dot);
+    setTimeout(() => dot.remove(), 600);
+  },
+
+  // Trigger capture ripple — Track B: upgraded to CSS-native ring
   triggerCaptureEffects(r, c, capturedColor) {
     const cellEl = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
     if (!cellEl) return;
-    
-    for (let i = 0; i < 12; i++) {
+    // Track B: CSS-native capture ring burst
+    const ring = document.createElement('div');
+    ring.className = 'capture-ring';
+    ring.style.color = `var(--color-${capturedColor})`;
+    cellEl.style.position = 'relative';
+    cellEl.style.overflow = 'visible';
+    cellEl.appendChild(ring);
+    setTimeout(() => ring.remove(), 550);
+    // Legacy particle shower (kept for richness)
+    for (let i = 0; i < 8; i++) {
       const particle = document.createElement('div');
-      particle.style.position = 'absolute';
-      particle.style.width = '6px';
-      particle.style.height = '6px';
-      particle.style.borderRadius = '50%';
-      particle.style.backgroundColor = `var(--color-${capturedColor})`;
-      particle.style.pointerEvents = 'none';
-      particle.style.zIndex = '50';
-      
-      const angle = Math.random() * Math.PI * 2;
-      const velocity = 2 + Math.random() * 4;
-      let x = 0;
-      let y = 0;
-      
+      particle.style.cssText = `position:absolute;width:5px;height:5px;border-radius:50%;background:var(--color-${capturedColor});pointer-events:none;z-index:50;`;
+      const angle = (i / 8) * Math.PI * 2;
+      const velocity = 3 + Math.random() * 3;
+      let x = 0, y = 0, frame = 0;
       cellEl.appendChild(particle);
-      
-      let frame = 0;
       const anim = () => {
         frame++;
         x += Math.cos(angle) * velocity;
         y += Math.sin(angle) * velocity;
-        particle.style.transform = `translate(${x}px, ${y}px)`;
-        particle.style.opacity = (1 - frame / 30).toString();
-        
-        if (frame < 30) {
-          requestAnimationFrame(anim);
-        } else {
-          particle.remove();
-        }
+        particle.style.transform = `translate(${x}px,${y}px)`;
+        particle.style.opacity = (1 - frame / 25).toString();
+        if (frame < 25) requestAnimationFrame(anim);
+        else particle.remove();
       };
       requestAnimationFrame(anim);
     }
@@ -1599,9 +1727,44 @@ const GameState = {
       return { nextState, captureOccurred };
     };
 
-    // Position evaluation
+    // Track A — AI Brain v2: Threat-aware position evaluation
+    const activeColors = this.players.map(p => p.color);
+    const maxRollVal = this.gridSize === 5 ? 8 : 12;
+    // firstInnerIndex already declared above
+
+    // Build threat map: for each cell on player's path, how close is the nearest opponent?
+    const buildThreatMap = (simState) => {
+      const threats = {}; // pathIndex -> threat score
+      const myPath = this.paths[player.color];
+      myPath.forEach((cell, idx) => {
+        const isSafe = GameEngine.isSafeCell(this.gridSize, cell.r, cell.c, activeColors);
+        if (isSafe) return;
+        let maxThreat = 0;
+        simState.opponents.forEach(opp => {
+          const oppPath = this.paths[opp.color];
+          opp.pawns.forEach(oppP => {
+            if (oppP.pathIndex === -1) return;
+            const oppCell = oppPath[oppP.pathIndex];
+            const idxOnOppPath = oppPath.findIndex(c => c.r === cell.r && c.c === cell.c);
+            if (idxOnOppPath !== -1) {
+              const steps = idxOnOppPath - oppP.pathIndex;
+              if (steps > 0 && steps <= maxRollVal) {
+                // Opponent can land here in one or two rolls
+                const urgency = Math.max(0, maxRollVal - steps + 1);
+                const threatVal = oppP.isGatti ? urgency * 60 : urgency * 35;
+                if (threatVal > maxThreat) maxThreat = threatVal;
+              }
+            }
+          });
+        });
+        threats[idx] = maxThreat;
+      });
+      return threats;
+    };
+
     const evaluateSimState = (simState) => {
       let score = 0;
+      const threatMap = buildThreatMap(simState);
       
       simState.pawns.forEach(pawn => {
         if (pawn.pathIndex === goalIndex) {
@@ -1609,45 +1772,60 @@ const GameState = {
         } else if (pawn.pathIndex === -1) {
           score += 0;
         } else {
-          if (simState.hasKilled) {
-            score += pawn.pathIndex * 35;
-          } else {
-            score += pawn.pathIndex * 15;
-          }
+          // Track A: Inner-ring endgame urgency — ramp multiplier
+          const isInner = pawn.pathIndex >= firstInnerIndex;
+          const progressMul = isInner ? 60 : (simState.hasKilled ? 35 : 15);
+          score += pawn.pathIndex * progressMul;
 
           const cell = this.paths[player.color][pawn.pathIndex];
-          if (GameEngine.isSafeCell(this.gridSize, cell.r, cell.c)) {
-            score += 250;
+          const isSafe = GameEngine.isSafeCell(this.gridSize, cell.r, cell.c, activeColors);
+          if (isSafe) {
+            score += 280;
           }
 
+          // Track A: Threat penalty — subtract danger of current position
+          if (!isSafe) {
+            const danger = threatMap[pawn.pathIndex] || 0;
+            score -= danger;
+          }
+
+          // Track A: Gatti strategy — reward forming Gattis more when opponent is close
           if (this.rules.gattiEnabled && pawn.isGatti) {
-            score += 450;
+            // Base Gatti bonus
+            score += 500;
+            // Extra bonus if there's a nearby opponent (Gatti provides safety)
+            const nearbyThreat = threatMap[pawn.pathIndex] || 0;
+            score += nearbyThreat * 0.5; // Gatti is safer under threat
           }
 
-          simState.opponents.forEach(opp => {
-            const oppPath = this.paths[opp.color];
-            opp.pawns.forEach(oppP => {
-              if (oppP.pathIndex !== -1) {
-                const oppCell = oppPath[oppP.pathIndex];
-                const cellIdxOnOppPath = oppPath.findIndex(c => c.r === cell.r && c.c === cell.c);
-                
-                if (cellIdxOnOppPath !== -1) {
-                  const stepDiff = cellIdxOnOppPath - oppP.pathIndex;
-                  if (stepDiff > 0 && stepDiff <= (this.gridSize === 5 ? 8 : 12)) {
-                    const isSafe = GameEngine.isSafeCell(this.gridSize, cell.r, cell.c);
-                    if (!isSafe) {
-                      const canCapture = !pawn.isGatti || oppP.isGatti;
-                      if (canCapture) {
-                        score -= oppP.isGatti ? 400 : 250;
-                      }
-                    }
-                  }
+          // Track A: Reward proximity to forming a Gatti (another same-color single pawn within 4 steps)
+          if (this.rules.gattiEnabled && !pawn.isGatti) {
+            const nearbyPartner = simState.pawns.find(other =>
+              other.id !== pawn.id && !other.isGatti && other.pathIndex !== -1 &&
+              other.pathIndex !== goalIndex &&
+              Math.abs(other.pathIndex - pawn.pathIndex) <= maxRollVal
+            );
+            if (nearbyPartner) score += 80;
+          }
+
+          // Track A: Penalise if opponent Gatti is ahead blocking our path
+          if (this.rules.gattiEnabled) {
+            simState.opponents.forEach(opp => {
+              const oppPath = this.paths[opp.color];
+              opp.pawns.filter(op => op.isGatti && op.pathIndex !== -1).forEach(oppGatti => {
+                const oppCell = oppPath[oppGatti.pathIndex];
+                const idxOnMyPath = this.paths[player.color].findIndex(c => c.r === oppCell.r && c.c === oppCell.c);
+                if (idxOnMyPath > pawn.pathIndex && idxOnMyPath - pawn.pathIndex <= maxRollVal * 2) {
+                  score -= 200; // blocked path ahead
                 }
-              }
+              });
             });
-          });
+          }
         }
       });
+
+      // Track A: Bonus for having killed (unlocks inner ring)
+      if (simState.hasKilled) score += 300;
 
       return score;
     };
@@ -1814,12 +1992,52 @@ const GameState = {
   },
 
   // Dynamic Board Renderer
+  // Track D: Build a snapshot key for a cell to detect if it needs re-render
+  _cellStateKey(r, c) {
+    const pawnsHere = [];
+    this.players.forEach((p, pIdx) => {
+      p.pawns.forEach(pawn => {
+        if (pawn.pathIndex !== -1) {
+          const pathCell = this.paths[pawn.color][pawn.pathIndex];
+          if (pathCell.r === r && pathCell.c === c) {
+            pawnsHere.push(`${pIdx}:${pawn.id}:${pawn.isGatti ? 'g' : 's'}`);
+          }
+        }
+      });
+    });
+    const isValid = this.gamePhase === 'moving' && this.selectedRollIndex !== null;
+    const highlights = [];
+    if (isValid) {
+      const value = this.rollQueue[this.selectedRollIndex];
+      const player = this.getCurrentPlayer();
+      if (player) {
+        player.pawns.forEach(pawn => {
+          if (pawn.pathIndex !== -1 && this.isValidPawnMove(pawn, value)) {
+            let targetIdx = pawn.pathIndex + value;
+            const firstInnerIdx = this.gridSize === 5 ? 16 : 24;
+            if (!player.hasKilled && targetIdx >= firstInnerIdx) targetIdx = targetIdx % firstInnerIdx;
+            if (targetIdx < this.paths[pawn.color].length) {
+              const tc = this.paths[pawn.color][targetIdx];
+              if (tc.r === r && tc.c === c) highlights.push(pawn.id);
+            }
+          }
+        });
+      }
+    }
+    return `${pawnsHere.join('|')}~${highlights.join(',')}`;
+  },
+
   renderBoard() {
     const boardGrid = document.getElementById('board');
     if (!boardGrid) return;
     
     boardGrid.className = `board-grid size-${this.gridSize}`;
-    boardGrid.innerHTML = '';
+    // Track D: Only full-rebuild if grid size changed, otherwise incremental
+    const sizeChanged = boardGrid.getAttribute('data-size') !== String(this.gridSize);
+    if (sizeChanged) {
+      boardGrid.innerHTML = '';
+      boardGrid.setAttribute('data-size', this.gridSize);
+    }
     
     // Update active player badge overlay
     const curPlayer = this.getCurrentPlayer();
@@ -1836,50 +2054,101 @@ const GameState = {
       rollBtn.disabled = this.gamePhase !== 'rolling' || curPlayer.isBot;
     }
 
-    // Build Cell Map
+    const activeColors = this.players.map(p => p.color);
+    const centerIdx = Math.ceil(this.gridSize / 2);
+    const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+
+    // Track D: Event delegation — single handler on board instead of per-pawn
+    boardGrid.onclick = (e) => {
+      const pawnEl = e.target.closest('.pawn');
+      if (!pawnEl) return;
+      document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
+      const pIdx = parseInt(pawnEl.getAttribute('data-player-index'));
+      const pId = parseInt(pawnEl.getAttribute('data-pawn-id'));
+      this.selectPawn(pIdx, pId);
+    };
+    boardGrid.onmouseover = (e) => {
+      const pawnEl = e.target.closest('.pawn');
+      if (!pawnEl) return;
+      if (this.gamePhase !== 'moving') return;
+      const pIdx = parseInt(pawnEl.getAttribute('data-player-index'));
+      if (pIdx !== this.currentPlayerIndex || this.getCurrentPlayer().isBot) return;
+      if (this.selectedRollIndex === null) return;
+      const pId = parseInt(pawnEl.getAttribute('data-pawn-id'));
+      const player = this.getCurrentPlayer();
+      const pawn = player.pawns.find(p => p.id === pId);
+      if (!pawn) return;
+      const value = this.rollQueue[this.selectedRollIndex];
+      if (!this.isValidPawnMove(pawn, value)) return;
+      let targetIdx = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + value;
+      if (!player.hasKilled && pawn.pathIndex !== -1 && targetIdx >= firstInnerIndex) {
+        targetIdx = targetIdx % firstInnerIndex;
+      }
+      if (targetIdx < this.paths[pawn.color].length) {
+        const tc = this.paths[pawn.color][targetIdx];
+        const cellEl = document.querySelector(`.cell[data-r="${tc.r}"][data-c="${tc.c}"]`);
+        if (cellEl) cellEl.classList.add('valid-target');
+      }
+    };
+    boardGrid.onmouseout = (e) => {
+      if (!e.target.closest('.pawn')) return;
+      document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
+    };
+
+    // Build Cell Map — Track D incremental: only re-render changed cells
     for (let r = 1; r <= this.gridSize; r++) {
       for (let c = 1; c <= this.gridSize; c++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.setAttribute('data-r', r);
-        cell.setAttribute('data-c', c);
+        const newKey = this._cellStateKey(r, c);
+        let cell = boardGrid.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
 
-        // Safe Square styling
-        const isSafe = GameEngine.isSafeCell(this.gridSize, r, c);
-        const centerIdx = Math.ceil(this.gridSize / 2);
-        
-        if (r === centerIdx && c === centerIdx) {
-          cell.classList.add('home-center');
-          cell.classList.add('safe');
-          const starEl = document.createElement('div');
-          starEl.innerText = '★';
-          starEl.className = 'home-star';
-          cell.appendChild(starEl);
-        } else if (isSafe) {
-          cell.classList.add('safe');
+        if (!cell || sizeChanged) {
+          // Create new cell
+          cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.setAttribute('data-r', r);
+          cell.setAttribute('data-c', c);
+          cell.setAttribute('data-key', newKey);
+
+          // Safe Square styling — Track C: pass active colors
+          const isSafe = GameEngine.isSafeCell(this.gridSize, r, c, activeColors);
           
-          // Color indicator for specific player safe start squares
-          if (r === this.gridSize && c === centerIdx) cell.classList.add('player-home-red');
-          else if (r === centerIdx && c === 1) cell.classList.add('player-home-green');
-          else if (r === 1 && c === centerIdx) cell.classList.add('player-home-yellow');
-          else if (r === centerIdx && c === this.gridSize) cell.classList.add('player-home-blue');
-        }
-
-        // Add entry mark indicator
-        const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
-        this.players.forEach(p => {
-          const path = this.paths[p.color];
-          if (path && path.length > firstInnerIndex) {
-            const entryCell = path[firstInnerIndex - 1]; // Cell before moving inward
-            if (entryCell.r === r && entryCell.c === c) {
-              cell.classList.add(`entry-mark-${p.color}`);
-            }
+          if (r === centerIdx && c === centerIdx) {
+            cell.classList.add('home-center', 'safe');
+            const starEl = document.createElement('div');
+            starEl.innerText = '★';
+            starEl.className = 'home-star';
+            cell.appendChild(starEl);
+          } else if (isSafe) {
+            cell.classList.add('safe');
+            if (r === this.gridSize && c === centerIdx && activeColors.includes('red')) cell.classList.add('player-home-red');
+            else if (r === centerIdx && c === 1 && activeColors.includes('green')) cell.classList.add('player-home-green');
+            else if (r === 1 && c === centerIdx && activeColors.includes('yellow')) cell.classList.add('player-home-yellow');
+            else if (r === centerIdx && c === this.gridSize && activeColors.includes('blue')) cell.classList.add('player-home-blue');
           }
-        });
+
+          // Entry mark indicators
+          this.players.forEach(p => {
+            const path = this.paths[p.color];
+            if (path && path.length > firstInnerIndex) {
+              const entryCell = path[firstInnerIndex - 1];
+              if (entryCell.r === r && entryCell.c === c) {
+                cell.classList.add(`entry-mark-${p.color}`);
+              }
+            }
+          });
+
+          boardGrid.appendChild(cell);
+        } else {
+          // Track D: skip re-render if state hasn't changed
+          const oldKey = cell.getAttribute('data-key');
+          if (oldKey === newKey) continue;
+          cell.setAttribute('data-key', newKey);
+          // Remove old pawn elements only
+          cell.querySelectorAll('.pawn').forEach(p => p.remove());
+        }
 
         // Draw Pawns in this Cell
         const pawnsInCell = [];
-        
         this.players.forEach((p, pIdx) => {
           p.pawns.forEach(pawn => {
             if (pawn.pathIndex !== -1) {
@@ -1891,25 +2160,14 @@ const GameState = {
           });
         });
 
-        // Group same-player pawns or stack multiple pawns
         if (pawnsInCell.length > 0) {
           const renderedItems = [];
-          
-          // Separate into Gattis and Singles
           const gattis = pawnsInCell.filter(item => item.pawn.isGatti);
           const singles = pawnsInCell.filter(item => !item.pawn.isGatti);
-          
-          // Add one element per Gatti pair
           for (let i = 0; i < gattis.length; i += 2) {
-            if (gattis[i]) {
-              renderedItems.push({ pawn: gattis[i].pawn, playerIdx: gattis[i].playerIdx, isGatti: true });
-            }
+            if (gattis[i]) renderedItems.push({ pawn: gattis[i].pawn, playerIdx: gattis[i].playerIdx, isGatti: true });
           }
-          
-          // Add all singles
-          singles.forEach(single => {
-            renderedItems.push({ pawn: single.pawn, playerIdx: single.playerIdx, isGatti: false });
-          });
+          singles.forEach(single => renderedItems.push({ pawn: single.pawn, playerIdx: single.playerIdx, isGatti: false }));
           
           renderedItems.forEach((item, index) => {
             const pEl = this.createPawnElement(item.pawn, item.playerIdx, item.isGatti);
@@ -1917,15 +2175,9 @@ const GameState = {
               pEl.style.transform = `translate(${index * 4 - (renderedItems.length * 2)}px, ${index * 4 - (renderedItems.length * 2)}px)`;
               pEl.style.position = 'absolute';
             }
-            
-            // If there are multiple Gattis (e.g., 2 Gattis = 4 pawns), we could add a badge.
-            // But visually, rendering them stacked works fine. 
-            
             cell.appendChild(pEl);
           });
         }
-
-        boardGrid.appendChild(cell);
       }
     }
 
@@ -1940,48 +2192,34 @@ const GameState = {
 
   createPawnElement(pawn, playerIdx, isGatti) {
     const pEl = document.createElement('div');
-    pEl.className = `pawn ${pawn.color} ${isGatti ? 'gatti' : ''}`;
+    // Track E: color-blind mode uses symbol class instead of color name
+    const colorBlind = GameState.settings.colorBlind;
+    const cbClass = colorBlind ? `cb-${pawn.color}` : '';
+    pEl.className = `pawn ${pawn.color} ${isGatti ? 'gatti' : ''} ${cbClass}`.trim();
     pEl.setAttribute('data-player-index', playerIdx);
     pEl.setAttribute('data-pawn-id', pawn.id);
+    // Track E: aria label for screen readers
+    const playerName = this.players[playerIdx]?.name || pawn.color;
+    pEl.setAttribute('aria-label', `${playerName} pawn${isGatti ? ' (Gatti)' : ''}`);
+    pEl.setAttribute('role', 'button');
+    pEl.setAttribute('tabindex', '0');
     
     // Add inner dot
     const inner = document.createElement('div');
     inner.className = 'pawn-inner';
     pEl.appendChild(inner);
 
-    pEl.onmouseenter = () => {
-      if (this.gamePhase !== 'moving' || playerIdx !== this.currentPlayerIndex || this.getCurrentPlayer().isBot) return;
-      if (this.selectedRollIndex === null) return;
-      const value = this.rollQueue[this.selectedRollIndex];
-      if (!this.isValidPawnMove(pawn, value)) return;
+    // Track E: Color-blind symbol overlay
+    if (colorBlind) {
+      const sym = document.createElement('span');
+      sym.className = 'cb-symbol';
+      const symbols = { red: '○', green: '□', yellow: '△', blue: '◇' };
+      sym.textContent = symbols[pawn.color] || '?';
+      pEl.appendChild(sym);
+    }
 
-      let targetCell;
-      if (pawn.pathIndex === -1) {
-        targetCell = this.paths[pawn.color][0];
-      } else {
-        let targetIdx = pawn.pathIndex + value;
-        const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
-        if (!this.getCurrentPlayer().hasKilled && targetIdx >= firstInnerIndex) {
-          targetIdx = targetIdx % firstInnerIndex;
-        }
-        targetCell = this.paths[pawn.color][targetIdx];
-      }
-      
-      const cellEl = document.querySelector(`.cell[data-r="${targetCell.r}"][data-c="${targetCell.c}"]`);
-      if (cellEl) cellEl.classList.add('valid-target');
-    };
-
-    pEl.onmouseleave = () => {
-      document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
-    };
-
-    pEl.onclick = (e) => {
-      document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
-      if (pEl.parentElement && pEl.parentElement.classList.contains('valid-target')) return;
-      e.stopPropagation();
-      this.selectPawn(playerIdx, pawn.id);
-    };
-
+    // Track D: hover/click handled by delegated handlers on boardGrid
+    // (handlers are set in renderBoard)
     return pEl;
   },
 
@@ -1995,7 +2233,6 @@ const GameState = {
 
       const playerIdx = this.players.findIndex(p => p.color === col);
       if (playerIdx === -1) {
-        // Hide unused yards visually
         yardEl.style.display = 'none';
         return;
       } else {
@@ -2006,9 +2243,36 @@ const GameState = {
       player.pawns.forEach(pawn => {
         if (pawn.pathIndex === -1) {
           const pEl = this.createPawnElement(pawn, playerIdx, false);
+          // Yard pawns also need click handler for spawning
+          pEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.selectPawn(playerIdx, pawn.id);
+          });
           yardEl.appendChild(pEl);
         }
       });
+    });
+
+    // Track B: Update player progress bars
+    this.updateProgressBars();
+  },
+
+  // Track B: Update player progress percentage bars
+  updateProgressBars() {
+    this.players.forEach((player, idx) => {
+      const barEl = document.getElementById(`progress-${player.color}`);
+      if (!barEl) return;
+      const goalIdx = this.paths[player.color].length - 1;
+      const totalProgress = player.pawns.reduce((sum, pawn) => {
+        if (pawn.pathIndex === goalIdx) return sum + 100;
+        if (pawn.pathIndex === -1) return sum;
+        return sum + Math.round((pawn.pathIndex / goalIdx) * 100);
+      }, 0);
+      const avg = Math.round(totalProgress / player.pawns.length);
+      barEl.style.width = `${avg}%`;
+      barEl.setAttribute('aria-valuenow', avg);
+      const labelEl = document.getElementById(`progress-label-${player.color}`);
+      if (labelEl) labelEl.textContent = `${avg}%`;
     });
   },
 
@@ -2238,6 +2502,10 @@ window.openSettingsMenu = function() {
     window.setVolume(s.volume !== undefined ? s.volume : 100);
     window.setAutoRoll(!!s.autoRoll);
     window.setBotSpeed(s.botSpeed || 'normal');
+    // Track E: sync color-blind button text
+    const cbBtn = document.getElementById('setting-colorblind');
+    if (cbBtn) cbBtn.textContent = s.colorBlind ? 'ON' : 'OFF';
+    if (cbBtn) cbBtn.classList.toggle('active', !!s.colorBlind);
   }
   if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
 };
@@ -2482,12 +2750,95 @@ window.startGame = function() {
   // Add History State for mobile back button handling
   history.pushState({ page: 'game' }, '', '#game');
   
+  // Track B: Build progress bars for each active player
+  const progressContainer = document.getElementById('progress-bars-container');
+  if (progressContainer) {
+    progressContainer.innerHTML = '';
+    playersList.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'progress-player-row';
+      row.innerHTML = `
+        <div class="progress-player-label">
+          <span class="progress-dot" style="background: var(--color-${p.color}); box-shadow: 0 0 6px var(--color-${p.color});"></span>
+          <span>${p.name}</span>
+          <span class="progress-pct" id="progress-label-${p.color}">0%</span>
+        </div>
+        <div class="progress-bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="progress-bar-fill" id="progress-${p.color}" style="background: var(--color-${p.color}); width: 0%;"></div>
+        </div>`;
+      progressContainer.appendChild(row);
+    });
+  }
+
+  // Track E: Reset undo button state
+  const undoBtn = document.getElementById('btn-undo');
+  if (undoBtn) undoBtn.disabled = true;
+
   // Render
   GameState.renderBoard();
 };
 
+// Track E: Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  // Don't fire inside text inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  
+  const gs = GameState;
+  
+  // Space = roll
+  if (e.code === 'Space' && gs.gamePhase === 'rolling' && !gs.getCurrentPlayer()?.isBot && !gs.isRollingAnim) {
+    e.preventDefault();
+    gs.rollCowries();
+    return;
+  }
+
+  // 1–6 = select roll queue index
+  if (gs.gamePhase === 'moving' && !gs.getCurrentPlayer()?.isBot) {
+    const num = parseInt(e.key);
+    if (num >= 1 && num <= 6) {
+      const idx = num - 1;
+      if (idx < gs.rollQueue.length) {
+        synth.playToggle();
+        gs.selectedRollIndex = idx;
+        gs.updateRollQueueUI();
+        gs.highlightValidPawns();
+        return;
+      }
+    }
+  }
+
+  // U = undo
+  if ((e.key === 'u' || e.key === 'U') && gs.undoSnapshot && !gs.getCurrentPlayer()?.isBot) {
+    e.preventDefault();
+    gs.applyUndo();
+    return;
+  }
+});
+
+// Track E: Color-blind mode toggle
+window.setColorBlind = function(enabled) {
+  GameState.settings.colorBlind = !!enabled;
+  saveSettings();
+  const btn = document.getElementById('setting-colorblind');
+  if (btn) { btn.classList.toggle('active', !!enabled); btn.textContent = enabled ? 'ON' : 'OFF'; }
+  // Re-render to apply new symbol classes
+  if (GameState.gamePhase !== 'setup') {
+    GameState.renderBoard();
+  }
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
 // DOM init scripts for toggle buttons
 document.addEventListener('DOMContentLoaded', () => {
+  // Migrate legacy save to new key
+  try {
+    const legacy = localStorage.getItem(SAVE_KEY_LEGACY);
+    if (legacy && !localStorage.getItem(SAVE_KEY)) {
+      localStorage.setItem(SAVE_KEY, legacy);
+      localStorage.removeItem(SAVE_KEY_LEGACY);
+    }
+  } catch(e) {}
+
   loadSettings();
   const s = GameState.settings;
   if (s.theme === 'light') {
@@ -2495,6 +2846,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   synth.volume = (s.volume !== undefined ? s.volume : 100) / 100;
   synth.muted = (s.volume === 0);
+  // Track E: Apply color-blind setting from stored prefs
+  if (s.colorBlind) {
+    document.body.classList.add('color-blind-mode');
+    const btn = document.getElementById('setting-colorblind');
+    if (btn) btn.classList.add('active');
+  }
   const volIcon = document.getElementById('volume-icon');
   if (volIcon) {
     volIcon.innerText = synth.muted ? '🔇' : '🔊';

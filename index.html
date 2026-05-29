@@ -163,12 +163,17 @@
     <!-- MAIN GAMEPLAY SCREEN -->
     <div id="game-screen" class="hidden">
       
-      <!-- Left Sidebar for Logs -->
+      <!-- Left Sidebar for Logs & Progress -->
       <div class="sidebar-left">
         <!-- Logging Console -->
         <div class="log-panel glass-panel">
           <div class="log-title">Khel Ka Vivaran</div>
-          <div class="log-content" id="log-box"></div>
+          <div class="log-content" id="log-box" role="log" aria-live="polite" aria-label="Game log"></div>
+        </div>
+        <!-- Track B: Player Progress Bars -->
+        <div class="progress-panel glass-panel" id="progress-panel">
+          <div class="progress-title">PROGRESS</div>
+          <div id="progress-bars-container"></div>
         </div>
       </div>
       
@@ -191,7 +196,7 @@
       <div class="sidebar">
         
         <!-- Current Turn Display -->
-        <div class="player-turn-indicator glass-panel">
+        <div class="player-turn-indicator glass-panel" aria-live="polite" aria-atomic="true">
           <div class="status-avatar" id="turn-avatar">●</div>
           <div class="turn-name-container">
             <span class="player-tag" id="turn-name">---</span>
@@ -227,14 +232,17 @@
 
         <!-- Utilities -->
         <div class="utility-controls glass-panel">
-          <button class="btn-icon" id="btn-help" onclick="openRulesGuide()" title="Rules">
+          <button class="btn-icon" id="btn-help" onclick="openRulesGuide()" title="Rules" aria-label="Open rules">
             <span>?</span>
           </button>
-          <button class="btn-icon" id="btn-settings" onclick="openSettingsMenu()" title="Settings">
+          <button class="btn-icon" id="btn-settings" onclick="openSettingsMenu()" title="Settings" aria-label="Open settings">
             <span>⚙️</span>
           </button>
-          <button class="btn-icon" id="btn-mute" onclick="toggleMute()" title="Mute Audio">
+          <button class="btn-icon" id="btn-mute" onclick="toggleMute()" title="Mute Audio" aria-label="Toggle mute">
             <span id="volume-icon">🔊</span>
+          </button>
+          <button class="btn-icon" id="btn-undo" onclick="GameState.applyUndo()" title="Undo last move (U)" aria-label="Undo" disabled>
+            <span>↩</span>
           </button>
           <button class="btn-primary" style="font-size: 0.85rem; padding: 8px 15px;" onclick="showQuitWarning()">Naya Khel</button>
         </div>
@@ -318,6 +326,24 @@
               <button class="btn-toggle" id="setting-speed-instant" onclick="window.setBotSpeed('instant')">Instant</button>
             </div>
           </div>
+
+          <!-- Color-Blind Mode -->
+          <div class="settings-option-row">
+            <div class="switch-container">
+              <span class="settings-option-label" style="margin: 0;">Color-Blind Mode (Symbols):</span>
+              <button class="btn-toggle" id="setting-colorblind" onclick="window.setColorBlind(!GameState.settings.colorBlind)" style="width:auto; padding: 8px 16px; flex:0;">OFF</button>
+            </div>
+          </div>
+
+          <!-- Keyboard Shortcuts Info -->
+          <div class="settings-option-row">
+            <span class="settings-option-label">Keyboard Shortcuts:</span>
+            <div style="font-size:0.82rem; color: var(--text-muted); line-height:1.8;">
+              <span style="color:var(--gold-chalk);">Space</span> — Roll &nbsp;
+              <span style="color:var(--gold-chalk);">1-6</span> — Select Roll &nbsp;
+              <span style="color:var(--gold-chalk);">U</span> — Undo
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -351,8 +377,8 @@
         <h2 class="victory-title" style="color: var(--gold-chalk); margin-bottom: 10px; font-size: 1.8rem;">GATTI OPTIONS</h2>
         <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 25px;">Aap is Gatti ko kaise chalna chahte hain?<br><span style="font-size: 0.9rem;">(How do you want to move this Gatti?)</span></p>
         <div style="display: flex; flex-direction: column; gap: 12px; align-items: center; width: 100%;">
-          <button class="btn-primary" id="btn-gatti-group" onclick="window.resolveGattiMove(true)" style="width: 100%; padding: 12px; font-size: 0.95rem;">Dono Gotiyan (Group Move: <span id="gatti-group-steps">0</span> Steps)</button>
-          <button class="btn-primary" id="btn-gatti-single" onclick="window.resolveGattiMove(false)" style="width: 100%; padding: 12px; font-size: 0.95rem;">Ek Goti (Single Move: <span id="gatti-single-steps">0</span> Steps)</button>
+          <button class="btn-primary" id="btn-gatti-group" onclick="window.resolveGattiMove(true)" style="width: 100%; padding: 12px; font-size: 0.95rem;">Dono Gotiyan (Group: <span id="gatti-group-steps">0</span> steps → <span id="gatti-group-dest" style="color:var(--gold-chalk)"></span>)</button>
+          <button class="btn-primary" id="btn-gatti-single" onclick="window.resolveGattiMove(false)" style="width: 100%; padding: 12px; font-size: 0.95rem;">Ek Goti (Single: <span id="gatti-single-steps">0</span> steps → <span id="gatti-single-dest" style="color:var(--gold-chalk)"></span>)</button>
           <button class="btn-toggle" onclick="window.cancelGattiChoice()" style="width: 100%; padding: 10px; margin-top: 5px; font-size: 0.9rem;">CANCEL</button>
         </div>
       </div>
