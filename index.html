@@ -22,14 +22,17 @@
 
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="preview.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1.0.5">
 </head>
 <body>
 
   <div class="container">
     <header>
-      <h1>CHANGA ASTA</h1>
-      <p>The Ancient Game of Strategy & Probability</p>
+      <canvas id="header-logo-canvas" width="64" height="64" class="header-logo-canvas"></canvas>
+      <div class="header-title-group">
+        <h1>CHANGA ASTA</h1>
+        <p>The Ancient Game of Strategy & Probability</p>
+      </div>
     </header>
 
     <!-- SETUP / LOBBY SCREEN -->
@@ -38,12 +41,13 @@
 
       <div class="lobby-layout">
         
+        <div class="lobby-col-left">
         <!-- Board Size Settings -->
         <div class="settings-group settings-board slide-up delay-1">
           <span class="settings-label">Board Chunein:</span>
           <div class="toggle-options" id="toggle-size-container">
-            <button class="btn-toggle active" data-val="5">5x5 Grid (4 Kaudi)</button>
-            <button class="btn-toggle" data-val="7">7x7 Grid (6 Kaudi)</button>
+            <button class="btn-toggle active" data-val="5">5x5 Grid <span class="btn-subtext">4 Kaudi</span></button>
+            <button class="btn-toggle" data-val="7">7x7 Grid <span class="btn-subtext">6 Kaudi</span></button>
           </div>
           <input type="hidden" id="select-size" data-value="5">
         </div>
@@ -79,7 +83,9 @@
           </div>
           <input type="hidden" id="select-difficulty" value="normal">
         </div>
+        </div>
 
+        <div class="lobby-col-right">
         <!-- PLAYER ROSTER -->
         <div class="settings-group roster-group settings-roster slide-up delay-5">
           <span class="settings-label">Khiladi Chunein:</span>
@@ -144,18 +150,19 @@
         <div class="settings-group settings-rules slide-up delay-4">
           <span class="settings-label">Niyam Chunein:</span>
           <div class="toggle-options">
-            <button class="btn-toggle active" id="rule-gatti">Gatti Banana (Blockades)</button>
-            <button class="btn-toggle" id="rule-spawn">Ghar Se Nikalna (4/8/6/12 Par)</button>
+            <button class="btn-toggle active" id="rule-gatti">Gatti Banana <span class="btn-subtext">Blockades</span></button>
+            <button class="btn-toggle" id="rule-spawn">Ghar Se Nikalna <span class="btn-subtext">4/8/6/12 Par</span></button>
           </div>
+        </div>
         </div>
 
       </div>
 
       <div class="slide-up delay-6" style="display: flex; justify-content: center; width: 100%;">
-        <button class="btn-primary" onclick="window.startGame()" style="width: 100%; max-width: 320px; padding: 15px 30px;">KHEL SHURU KAREIN</button>
+        <button class="btn-primary" onclick="window.startGame()" style="width: 100%; max-width: 320px;">KHEL SHURU KAREIN</button>
       </div>
       <div id="resume-panel" class="resume-panel hidden">
-        <button class="btn-primary" onclick="window.resumeSavedGame()">Continue Saved Game</button>
+        <button class="btn-primary" onclick="window.resumeSavedGame()">Continue Game</button>
         <button class="btn-toggle" onclick="window.clearSavedGame()">Clear Save</button>
       </div>
     </div>
@@ -163,19 +170,7 @@
     <!-- MAIN GAMEPLAY SCREEN -->
     <div id="game-screen" class="hidden">
       
-      <!-- Left Sidebar for Logs & Progress -->
-      <div class="sidebar-left">
-        <!-- Logging Console -->
-        <div class="log-panel glass-panel">
-          <div class="log-title">Khel Ka Vivaran</div>
-          <div class="log-content" id="log-box" role="log" aria-live="polite" aria-label="Game log"></div>
-        </div>
-        <!-- Track B: Player Progress Bars -->
-        <div class="progress-panel glass-panel" id="progress-panel">
-          <div class="progress-title">PROGRESS</div>
-          <div id="progress-bars-container"></div>
-        </div>
-      </div>
+
       
       <!-- Board Area with Chalk Pockets -->
       <div class="board-outer-container">
@@ -197,7 +192,7 @@
         
         <!-- Current Turn Display -->
         <div class="player-turn-indicator glass-panel" aria-live="polite" aria-atomic="true">
-          <div class="status-avatar" id="turn-avatar">●</div>
+          <div class="status-avatar" id="turn-avatar"></div>
           <div class="turn-name-container">
             <span class="player-tag" id="turn-name">---</span>
             <span class="phase-tag" id="turn-phase">---</span>
@@ -206,6 +201,16 @@
 
         <!-- Rolling Panel -->
         <div class="roll-panel glass-panel">
+          <!-- Score panel (Three placeholders) -->
+          <div class="roll-score-panel">
+            <span class="roll-score-label">Score:</span>
+            <div class="roll-score-slots">
+              <div class="roll-score-slot" id="score-slot-0"></div>
+              <div class="roll-score-slot" id="score-slot-1"></div>
+              <div class="roll-score-slot" id="score-slot-2"></div>
+            </div>
+          </div>
+
           <!-- 3D Cowrie Shell Elements -->
           <div class="shells-container">
             <div class="cowrie-shell" id="shell-0"><div class="slit"></div><div class="back-ridges"></div></div>
@@ -217,7 +222,7 @@
           </div>
 
           <!-- Throw Power Meter -->
-          <div id="power-meter-container" class="power-meter-container hidden">
+          <div id="power-meter-container" class="power-meter-container">
             <div class="power-meter-label">TOSS POWER: <span id="power-text">0%</span></div>
             <div class="power-meter-track">
               <div id="power-bar" class="power-bar"></div>
@@ -225,13 +230,13 @@
           </div>
 
           <button id="btn-roll" class="btn-primary" style="width: 100%;">KAUDI FEKEIN</button>
-          
-          <!-- Remaining Move values to apply -->
-          <div id="roll-queue" class="queue-panel"></div>
         </div>
 
         <!-- Utilities -->
         <div class="utility-controls glass-panel">
+          <button class="btn-icon" id="btn-log" onclick="openLogOverlay()" title="Game Log" aria-label="Open log">
+            <span>📜</span>
+          </button>
           <button class="btn-icon" id="btn-help" onclick="openRulesGuide()" title="Rules" aria-label="Open rules">
             <span>?</span>
           </button>
@@ -247,6 +252,17 @@
           <button class="btn-primary" style="font-size: 0.85rem; padding: 8px 15px;" onclick="showQuitWarning()">Naya Khel</button>
         </div>
 
+      </div>
+    </div>
+
+    <!-- LOG OVERLAY -->
+    <div id="log-overlay" class="hidden">
+      <div class="rules-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="log-title">
+        <div class="rules-header">
+          <h2 id="log-title">Khel Ka Vivaran</h2>
+          <button class="btn-icon" onclick="closeLogOverlay()" title="Close">x</button>
+        </div>
+        <div class="log-content" id="log-box" role="log" aria-live="polite" aria-label="Game log" style="max-height: 400px; overflow-y: auto;"></div>
       </div>
     </div>
 

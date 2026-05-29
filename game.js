@@ -858,7 +858,6 @@ const GameState = {
 
   updateRollQueueUI() {
     const queuePanel = document.getElementById('roll-queue');
-    if (!queuePanel) return;
 
     if (this.gamePhase === 'moving' && this.rollQueue.length > 0 && this.selectedRollIndex !== null) {
       const currentVal = this.rollQueue[this.selectedRollIndex];
@@ -875,30 +874,61 @@ const GameState = {
       }
     }
 
-    queuePanel.innerHTML = '';
-    
-    if (this.rollQueue.length === 0) {
-      queuePanel.classList.add('hidden');
-    } else {
-      queuePanel.classList.remove('hidden');
+    if (queuePanel) {
+      queuePanel.innerHTML = '';
+      if (this.rollQueue.length === 0) {
+        queuePanel.classList.add('hidden');
+      } else {
+        queuePanel.classList.remove('hidden');
+      }
+      
+      this.rollQueue.forEach((val, idx) => {
+        const badge = document.createElement('div');
+        badge.className = `queue-badge ${idx === this.selectedRollIndex ? 'selected' : ''}`;
+        badge.innerText = val;
+        badge.onclick = () => {
+          if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
+            synth.playToggle();
+            this.selectedRollIndex = idx;
+            this.updateRollQueueUI();
+            this.highlightValidPawns();
+          }
+        };
+        queuePanel.appendChild(badge);
+      });
     }
-    
-    this.rollQueue.forEach((val, idx) => {
-      const badge = document.createElement('div');
-      badge.className = `queue-badge ${idx === this.selectedRollIndex ? 'selected' : ''}`;
-      badge.innerText = val;
-      badge.onclick = () => {
-        if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
-          synth.playToggle();
-          this.selectedRollIndex = idx;
-          this.updateRollQueueUI();
-          this.highlightValidPawns();
-        }
-      };
-      queuePanel.appendChild(badge);
-    });
 
     this.highlightValidPawns();
+
+    // Update the Score placeholders
+    for (let i = 0; i < 3; i++) {
+      const slot = document.getElementById(`score-slot-${i}`);
+      if (slot) {
+        const val = this.rollQueue[i];
+        if (val !== undefined) {
+          slot.innerText = val;
+          slot.classList.add('filled');
+          if (i === this.selectedRollIndex) {
+            slot.classList.add('selected');
+          } else {
+            slot.classList.remove('selected');
+          }
+          slot.onclick = () => {
+            if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
+              synth.playToggle();
+              this.selectedRollIndex = i;
+              this.updateRollQueueUI();
+              this.highlightValidPawns();
+            }
+          };
+        } else {
+          slot.innerText = '';
+          slot.classList.remove('filled');
+          slot.classList.remove('selected');
+          slot.onclick = null;
+        }
+      }
+    }
   },
 
   // Highlight pawns that have valid moves for the selected roll value
@@ -2229,15 +2259,18 @@ const GameState = {
     colors.forEach(col => {
       const yardEl = document.getElementById(`yard-${col}`);
       if (!yardEl) return;
-      yardEl.innerHTML = '';
 
       const playerIdx = this.players.findIndex(p => p.color === col);
       if (playerIdx === -1) {
+        yardEl.innerHTML = '';
         yardEl.style.display = 'none';
         return;
       } else {
         yardEl.style.display = 'flex';
       }
+
+      // Recreate the progress label placeholder dynamically
+      yardEl.innerHTML = `<span class="yard-progress-label" id="yard-progress-text-${col}">0%</span>`;
 
       const player = this.players[playerIdx];
       player.pawns.forEach(pawn => {
@@ -2260,8 +2293,6 @@ const GameState = {
   // Track B: Update player progress percentage bars
   updateProgressBars() {
     this.players.forEach((player, idx) => {
-      const barEl = document.getElementById(`progress-${player.color}`);
-      if (!barEl) return;
       const goalIdx = this.paths[player.color].length - 1;
       const totalProgress = player.pawns.reduce((sum, pawn) => {
         if (pawn.pathIndex === goalIdx) return sum + 100;
@@ -2269,10 +2300,30 @@ const GameState = {
         return sum + Math.round((pawn.pathIndex / goalIdx) * 100);
       }, 0);
       const avg = Math.round(totalProgress / player.pawns.length);
-      barEl.style.width = `${avg}%`;
-      barEl.setAttribute('aria-valuenow', avg);
+      
+      // Update sidebar progress bars if present
+      const barEl = document.getElementById(`progress-${player.color}`);
+      if (barEl) {
+        barEl.style.width = `${avg}%`;
+        barEl.setAttribute('aria-valuenow', avg);
+      }
       const labelEl = document.getElementById(`progress-label-${player.color}`);
       if (labelEl) labelEl.textContent = `${avg}%`;
+
+      // Update yard progress ring variables
+      const yardEl = document.getElementById(`yard-${player.color}`);
+      if (yardEl) {
+        yardEl.style.setProperty('--progress', `${avg}%`);
+      }
+      const yardLabel = document.getElementById(`yard-progress-text-${player.color}`);
+      if (yardLabel) {
+        yardLabel.textContent = `${avg}%`;
+        if (avg === 0) {
+          yardLabel.style.opacity = '0';
+        } else {
+          yardLabel.style.opacity = '0.85';
+        }
+      }
     });
   },
 
@@ -2299,10 +2350,8 @@ const GameState = {
       clickStart = Date.now();
 
       // Show power meter
-      const powerMeter = document.getElementById('power-meter-container');
       const powerBar = document.getElementById('power-bar');
       const powerText = document.getElementById('power-text');
-      if (powerMeter) powerMeter.classList.remove('hidden');
       if (powerBar) powerBar.style.width = '10%';
       if (powerText) powerText.innerText = '10%';
 
@@ -2352,14 +2401,6 @@ const GameState = {
 
       // Perform the roll!
       this.rollCowries(finalStrength);
-
-      // Hide power meter after a small delay to let user see their power
-      setTimeout(() => {
-        if (!isCharging) {
-          const powerMeter = document.getElementById('power-meter-container');
-          if (powerMeter) powerMeter.classList.add('hidden');
-        }
-      }, 1000);
     };
 
     // Attach both touch and mouse events
@@ -2377,11 +2418,8 @@ const GameState = {
   simulateBotChargeAndRoll() {
     this.isRollingAnim = true; // Block double rolls
     
-    const powerMeter = document.getElementById('power-meter-container');
     const powerBar = document.getElementById('power-bar');
     const powerText = document.getElementById('power-text');
-    
-    if (powerMeter) powerMeter.classList.remove('hidden');
     
     // Start bot rattle sound
     synth.startRattle();
@@ -2410,11 +2448,6 @@ const GameState = {
           if (this.gamePhase === 'rolling') {
             this.rollCowries(botPower / 100);
           }
-
-          // Hide power meter
-          setTimeout(() => {
-            if (powerMeter) powerMeter.classList.add('hidden');
-          }, 1000);
         }, 150);
       }
       
@@ -2531,6 +2564,20 @@ window.cancelGattiChoice = function() {
   document.getElementById('gatti-choice-overlay').classList.add('hidden');
   GameState.pendingGattiPawn = null;
   GameState.pendingGattiValue = null;
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+};
+
+window.openLogOverlay = function() {
+  const overlay = document.getElementById('log-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+  const logBox = document.getElementById('log-box');
+  if (logBox) logBox.scrollTop = logBox.scrollHeight;
+};
+
+window.closeLogOverlay = function() {
+  const overlay = document.getElementById('log-overlay');
+  if (overlay) overlay.classList.add('hidden');
   if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
 };
 

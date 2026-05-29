@@ -13,49 +13,69 @@
     document.head.appendChild(link);
   }
 
-  function drawCowrie(x, y, angle, isFaceUp) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
+  function drawCowrie(targetCtx, scale, x, y, angle, isFaceUp, isLight) {
+    targetCtx.save();
+    targetCtx.translate(x * scale, y * scale);
+    targetCtx.rotate(angle);
     
-    // Draw outer shell (gold/beige)
-    ctx.fillStyle = '#e3c06d';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 6, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Choose colors based on theme
+    const shellColor = isLight ? '#d29c8f' : '#e3c06d'; // Rose Gold/Copper vs Gold
+    const edgeColor = isLight ? '#9c6559' : '#b98c3e'; // Darker Rose Gold vs Darker Gold
+    const slitColor = isLight ? '#592f25' : '#5d4f37'; // Deep copper-brown vs Dark bronze-brown
+    
+    // Draw outer shell
+    targetCtx.fillStyle = shellColor;
+    targetCtx.beginPath();
+    targetCtx.ellipse(0, 0, 6 * scale, 8 * scale, 0, 0, Math.PI * 2);
+    targetCtx.fill();
     
     // Draw shadow/edge
-    ctx.strokeStyle = '#b98c3e';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    targetCtx.strokeStyle = edgeColor;
+    targetCtx.lineWidth = 1.5 * scale;
+    targetCtx.stroke();
 
     if (isFaceUp) {
-      // Draw inner slit (dark)
-      ctx.fillStyle = '#5d4f37';
-      ctx.beginPath();
-      // An elegant slit
-      ctx.ellipse(0, 0, 1.5, 6, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw inner slit (dark/concave area)
+      targetCtx.fillStyle = slitColor;
+      targetCtx.beginPath();
+      targetCtx.ellipse(0, 0, 1.5 * scale, 6 * scale, 0, 0, Math.PI * 2);
+      targetCtx.fill();
     }
     
-    ctx.restore();
+    targetCtx.restore();
   }
 
   let startTime = Date.now();
 
   function animate() {
+    // Check if light theme is active
+    const isLight = document.body.classList.contains('light-theme');
+    
     ctx.clearRect(0, 0, 32, 32);
     
+    const logoCanvas = document.getElementById('header-logo-canvas');
+    let logoCtx = null;
+    let dpr = 1;
+    
+    if (logoCanvas) {
+      dpr = window.devicePixelRatio || 1;
+      // Handle high-DPI scaling dynamically
+      const targetWidth = 64 * dpr;
+      const targetHeight = 64 * dpr;
+      if (logoCanvas.width !== targetWidth || logoCanvas.height !== targetHeight) {
+        logoCanvas.width = targetWidth;
+        logoCanvas.height = targetHeight;
+      }
+      logoCtx = logoCanvas.getContext('2d');
+      logoCtx.clearRect(0, 0, targetWidth, targetHeight);
+    }
+    
     const elapsed = Date.now() - startTime;
-    // Each phase (0 to 4 openings) lasts 2 seconds
     const cycleDuration = 2000; 
     const currentCycle = Math.floor(elapsed / cycleDuration);
     const cycleTime = elapsed % cycleDuration;
     
-    // Current target state (0 to 4 mouths open)
     const state = currentCycle % 5; 
-    
-    // First 400ms of the cycle is a "rolling" shake transition
     const isRolling = cycleTime < 400; 
     
     const positions = [
@@ -66,7 +86,6 @@
     ];
     
     positions.forEach((pos, idx) => {
-      // Fast jitter when rolling, slow breathing when idle
       const jiggleX = isRolling ? Math.sin(elapsed * 0.05 + pos.phase) * 3 : Math.sin(elapsed * 0.002 + pos.phase) * 0.3;
       const jiggleY = isRolling ? Math.cos(elapsed * 0.04 + pos.phase) * 3 : Math.cos(elapsed * 0.003 + pos.phase) * 0.3;
       
@@ -79,15 +98,19 @@
          isFaceUp = idx < state;
       }
 
-      drawCowrie(pos.x + jiggleX, pos.y + jiggleY, angle, isFaceUp);
+      // Draw favicon (32x32, scale=1)
+      drawCowrie(ctx, 1, pos.x + jiggleX, pos.y + jiggleY, angle, isFaceUp, isLight);
+      
+      // Draw header logo (64x64 backing scaled by dpr, base scale = 2 * dpr)
+      if (logoCtx) {
+        drawCowrie(logoCtx, 2 * dpr, pos.x + jiggleX, pos.y + jiggleY, angle, isFaceUp, isLight);
+      }
     });
     
     link.href = canvas.toDataURL('image/png');
     
-    // High framerate while rolling, low framerate when idle (saves battery)
     setTimeout(animate, isRolling ? 66 : 250); 
   }
 
-  // Start animation
   animate();
 })();

@@ -43,8 +43,11 @@ A polished vanilla-web implementation of **Changa Asta**, also known as **Chowka
 - [favicon.js](favicon.js): Procedural animated favicon.
 - [manifest.json](manifest.json): PWA metadata.
 - [sw.js](sw.js): Offline cache service worker.
-- [gen_paths.py](gen_paths.py): Helper script for generating reference coordinate paths.
-- [paths_output.md](paths_output.md): Reference 5x5 coordinate paths.
+- [scripts/gen_paths.py](scripts/gen_paths.py): Helper script for generating reference coordinate paths.
+- [docs/paths_output.md](docs/paths_output.md): Reference 5x5 coordinate paths.
+- [docs/CHOWKA_BHARA.md](docs/CHOWKA_BHARA.md): Guide covering the history, setup, and core gameplay rules.
+- [docs/GATTI_RULES.md](docs/GATTI_RULES.md): Detailed rulebook explaining Gatti formation, splits, movement, blockades, and protection shields.
+- [docs/changa_asta_research.md](docs/changa_asta_research.md): Research document detailing board math, paths, and probabilities.
 - [tests/rules.test.js](tests/rules.test.js): Dependency-free Node sanity tests for board/path rules.
 
 ## Core Rules
