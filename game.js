@@ -89,23 +89,31 @@ class SoundSynth {
   playMove() {
     if (this.muted || this.volume <= 0) return;
     this.init();
-    
     const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
-    
-    gain.gain.setValueAtTime(0.1 * this.volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + 0.15);
-    
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    
-    osc.start(now);
-    osc.stop(now + 0.15);
+    // Layer 1: percussion click
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(400, now);
+    osc1.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+    gain1.gain.setValueAtTime(0.12 * this.volume, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + 0.1);
+    osc1.connect(gain1);
+    gain1.connect(this.ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.12);
+    // Layer 2: pitch confirmation
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(520, now + 0.05);
+    osc2.frequency.exponentialRampToValueAtTime(660, now + 0.25);
+    gain2.gain.setValueAtTime(0.08 * this.volume, now + 0.05);
+    gain2.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + 0.25);
+    osc2.connect(gain2);
+    gain2.connect(this.ctx.destination);
+    osc2.start(now + 0.05);
+    osc2.stop(now + 0.28);
   }
 
   playCapture() {
@@ -183,6 +191,62 @@ class SoundSynth {
     gain.connect(this.ctx.destination);
     osc.start(now);
     osc.stop(now + 0.08);
+  }
+
+  playExtraRoll() {
+    if (this.muted || this.volume <= 0) return;
+    this.init();
+    const now = this.ctx.currentTime;
+    [440, 550, 660].forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.1);
+      gain.gain.setValueAtTime(0.13 * this.volume, now + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + i * 0.1 + 0.15);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + i * 0.1);
+      osc.stop(now + i * 0.1 + 0.2);
+    });
+  }
+
+  playGatti() {
+    if (this.muted || this.volume <= 0) return;
+    this.init();
+    const now = this.ctx.currentTime;
+    [300, 450].forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + i * 0.05);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + i * 0.05 + 0.2);
+      gain.gain.setValueAtTime(0.12 * this.volume, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + i * 0.05 + 0.3);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.35);
+    });
+  }
+
+  playSpawn() {
+    if (this.muted || this.volume <= 0) return;
+    this.init();
+    const now = this.ctx.currentTime;
+    const notes = [261.63, 392.00, 523.25];
+    notes.forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.08);
+      gain.gain.setValueAtTime(0.1 * this.volume, now + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.volume, now + i * 0.08 + 0.25);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + i * 0.08);
+      osc.stop(now + i * 0.08 + 0.3);
+    });
   }
 }
 
@@ -983,6 +1047,33 @@ const GameState = {
         if (pawnEl) pawnEl.classList.add('active-move');
       }
     });
+
+    // Highlight all destination cells for all active-move pawns
+    if (this.gamePhase === 'moving' && this.selectedRollIndex !== null) {
+      const value = this.rollQueue[this.selectedRollIndex];
+      const player = this.getCurrentPlayer();
+      const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+      player.pawns.forEach(pawn => {
+        if (!this.isValidPawnMove(pawn, value)) return;
+        const path = this.paths[pawn.color];
+        const stepsOptions = [];
+        if (pawn.pathIndex !== -1 && pawn.isGatti && value % 2 === 0 && this.isValidPawnMove(pawn, value, true)) {
+          stepsOptions.push(value / 2);
+        }
+        if (this.isValidPawnMove(pawn, value, false)) {
+          stepsOptions.push(value);
+        }
+        stepsOptions.forEach(steps => {
+          let destIdx = pawn.pathIndex === -1 ? 0 : pawn.pathIndex + steps;
+          if (!player.hasKilled && destIdx >= firstInnerIndex) destIdx = destIdx % firstInnerIndex;
+          if (destIdx < path.length) {
+            const dest = path[destIdx];
+            const destEl = document.querySelector(`.cell[data-r="${dest.r}"][data-c="${dest.c}"]`);
+            if (destEl) destEl.classList.add('valid-target');
+          }
+        });
+      });
+    }
   },
 
   updateSkillsUI() {
@@ -1373,7 +1464,7 @@ const GameState = {
   },
 
   executeMove(pawn, value, isGroupMove = false) {
-    synth.playMove();
+    if (pawn.pathIndex === -1) { synth.playSpawn(); } else { synth.playMove(); }
     // Track C: save undo snapshot before executing move (human players only)
     if (!this.getCurrentPlayer().isBot) {
       this.saveUndoSnapshot();
@@ -1477,6 +1568,7 @@ const GameState = {
         this.addLog(player.name, `Gatti ban gayi!`);
         // Track B: mark for burst animation — applied after render
         this._gattiNewPawnIds = [pawn.id, partner.id];
+        synth.playGatti();
       }
     }
 
@@ -1578,6 +1670,7 @@ const GameState = {
       this.selectedRollIndex = null;
       this.updateRollQueueUI();
       this.addLog('System', `${player.name} ko ek aur mauka mila!`);
+      synth.playExtraRoll();
       showToast('Extra roll earned', 'good');
 
       this.renderBoard();
@@ -1663,6 +1756,14 @@ const GameState = {
       turnIndicator.classList.add('turn-change');
     }
 
+    const boardFrame = document.querySelector('.board-frame');
+    if (boardFrame) {
+      boardFrame.classList.remove('turn-flash');
+      void boardFrame.offsetWidth;
+      boardFrame.classList.add('turn-flash');
+      setTimeout(() => boardFrame.classList.remove('turn-flash'), 700);
+    }
+
     const nextPlayer = this.getCurrentPlayer();
     this.addLog('System', `Ab ${nextPlayer.name} ki baari hai.`);
     this.saveGame();
@@ -1695,6 +1796,19 @@ const GameState = {
     setTimeout(() => {
       if (this.gamePhase !== 'gameover') return;
       document.getElementById('victory-overlay').classList.remove('hidden');
+      // Confetti burst
+      const confettiColors = ['#dfb15b', '#ff3b57', '#2cf583', '#ffd02b', '#2bb1ff', '#c77dff'];
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        const size = 6 + Math.random() * 6;
+        p.style.cssText = `position:fixed;width:${size}px;height:${size}px;border-radius:${Math.random() > 0.5 ? '50%' : '2px'};pointer-events:none;z-index:3000;background:${confettiColors[i % confettiColors.length]};left:${Math.random() * 100}vw;top:-12px;transition:transform ${1.2 + Math.random() * 1.2}s ease-in, opacity ${0.8 + Math.random() * 0.5}s ease-in ${0.4 + Math.random() * 0.4}s;`;
+        document.body.appendChild(p);
+        requestAnimationFrame(() => {
+          p.style.transform = `translateY(${75 + Math.random() * 25}vh) rotate(${Math.random() * 720 - 360}deg) translateX(${Math.random() * 60 - 30}px)`;
+          p.style.opacity = '0';
+        });
+        setTimeout(() => p.remove(), 3500);
+      }
       const banner = document.getElementById('victory-banner');
       if (banner) {
         banner.innerText = `${player.name} Jeet Gaya!`;
@@ -1765,10 +1879,11 @@ const GameState = {
           if (dx !== 0 || dy !== 0) {
             if (typeof newEl.animate === 'function') {
               newEl.animate([
-                { transform: `translate(${dx}px, ${dy}px) scale(1.3)` },
+                { transform: `translate(${dx}px, ${dy}px) scale(1.4)` },
+                { transform: 'translate(0, 0) scale(0.88)' },
                 { transform: 'translate(0, 0) scale(1)' }
               ], {
-                duration: 400,
+                duration: 480,
                 easing: 'cubic-bezier(0.25, 1, 0.5, 1)'
               });
             }
@@ -2142,6 +2257,17 @@ const GameState = {
       // Track A: Bonus for having killed (unlocks inner ring)
       if (simState.hasKilled) score += 300;
 
+      // Penalise clustering: multiple single pawns on same outer-ring cell
+      const outerPositions = {};
+      simState.pawns.forEach(p => {
+        if (p.pathIndex !== -1 && p.pathIndex < goalIndex && p.pathIndex < firstInnerIndex && !p.isGatti) {
+          outerPositions[p.pathIndex] = (outerPositions[p.pathIndex] || 0) + 1;
+        }
+      });
+      Object.values(outerPositions).forEach(count => {
+        if (count > 1) score -= 150 * (count - 1);
+      });
+
       return score;
     };
 
@@ -2177,7 +2303,8 @@ const GameState = {
             const nextRolls = remainingRolls.filter((_, idx) => idx !== i);
             
             const result = searchBestSequence(nextState, nextRolls);
-            const score = result.score + (captureOccurred ? 1800 : 0);
+            const captureBonus = captureOccurred ? (difficulty === 'smart' ? 2200 : 1800) : 0;
+            const score = result.score + captureBonus;
             
             if (score > bestScore) {
               bestScore = score;
@@ -2394,7 +2521,8 @@ const GameState = {
     const difficulty = player.botDifficulty || this.botDifficulty || 'normal';
     const initialSimState = getInitialSimState();
 
-    if (difficulty === 'easy') {
+    if (difficulty === 'easy' && Math.random() < 0.4) {
+      // Easy difficulty: 40% of the time pick a completely random valid move
       const legalMoves = [];
       this.rollQueue.forEach((value, rollIdx) => {
         player.pawns.forEach(pawn => {
@@ -2427,10 +2555,9 @@ const GameState = {
             if (this.gamePhase === 'moving') this.executeMove(pawnToMove, chosen.value, chosen.isGroupMove);
           }, this.getBotDelay('submove'));
         }, this.getBotDelay('move') / 2);
-      } else {
-        this.endTurn();
+        return;
       }
-      return;
+      // If no valid moves found, fall through to searchBestSequence for endTurn
     }
 
     if (difficulty === 'normal') {
@@ -2474,6 +2601,38 @@ const GameState = {
     }
 
     const searchResult = searchBestSequence(initialSimState, this.rollQueue);
+
+    // Easy difficulty: occasionally pick a random valid move instead of the best sequence
+    if (difficulty === 'easy' && Math.random() < 0.4 && searchResult.sequence.length > 0) {
+      const validMoves = [];
+      this.rollQueue.forEach((val, rollIdx) => {
+        player.pawns.forEach(pawn => {
+          const opts = [];
+          const simPawn = initialSimState.pawns.find(p => p.id === pawn.id);
+          if (!simPawn) return;
+          if (simPawn.isGatti) {
+            if (isValidPawnMoveSim(initialSimState, simPawn, val, false)) opts.push({ pawnId: pawn.id, value: val, rollIdx, isGroupMove: false });
+            if (val % 2 === 0 && isValidPawnMoveSim(initialSimState, simPawn, val, true)) opts.push({ pawnId: pawn.id, value: val, rollIdx, isGroupMove: true });
+          } else if (isValidPawnMoveSim(initialSimState, simPawn, val, false)) {
+            opts.push({ pawnId: pawn.id, value: val, rollIdx, isGroupMove: false });
+          }
+          validMoves.push(...opts);
+        });
+      });
+      if (validMoves.length > 0) {
+        const pick = validMoves[Math.floor(Math.random() * validMoves.length)];
+        const pawnToMove = player.pawns.find(p => p.id === pick.pawnId);
+        setTimeout(() => {
+          if (this.gamePhase !== 'moving') return;
+          this.selectedRollIndex = pick.rollIdx;
+          this.updateRollQueueUI();
+          setTimeout(() => {
+            if (this.gamePhase === 'moving') this.executeMove(pawnToMove, pick.value, pick.isGroupMove);
+          }, this.getBotDelay('submove'));
+        }, this.getBotDelay('move') / 2);
+        return;
+      }
+    }
 
     if (searchResult.sequence.length > 0) {
       const bestStep = searchResult.sequence[0];
@@ -2714,6 +2873,8 @@ const GameState = {
       this.updateSkillsUI();
       this.highlightSkillTargetPawns();
     }
+
+    this.updatePlayersStrip();
   },
 
   createPawnElement(pawn, playerIdx, isGatti) {
@@ -2828,6 +2989,22 @@ const GameState = {
           yardLabel.style.opacity = '0.85';
         }
       }
+    });
+  },
+
+  updatePlayersStrip() {
+    const strip = document.getElementById('players-strip');
+    if (!strip) return;
+    strip.innerHTML = '';
+    this.players.forEach((player, idx) => {
+      const goalIdx = this.paths[player.color] ? this.paths[player.color].length - 1 : 0;
+      const onBoard = player.pawns.filter(p => p.pathIndex !== -1 && p.pathIndex < goalIdx).length;
+      const atGoal = player.pawns.filter(p => p.pathIndex === goalIdx).length;
+      const chip = document.createElement('div');
+      chip.className = `player-strip-chip${idx === this.currentPlayerIndex ? ' active-turn' : ''}`;
+      chip.style.setProperty('--chip-color', `var(--color-${player.color})`);
+      chip.innerHTML = `<div class="player-strip-dot"></div><span>${player.name.split(' ')[0]}</span><span style="opacity:0.7;margin-left:3px">${onBoard}▶ ${atGoal}🏠</span>`;
+      strip.appendChild(chip);
     });
   },
 

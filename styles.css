@@ -492,6 +492,14 @@ header p {
   position: relative;
 }
 
+@keyframes boardTurnFlash {
+  0% { box-shadow: 0 0 0 3px rgba(223,177,91,0.8), 0 0 40px rgba(223,177,91,0.5); }
+  100% { box-shadow: 0 0 0 2px #dfb15b, inset 0 0 25px rgba(0,0,0,0.95), 0 20px 50px rgba(0,0,0,0.75); }
+}
+.board-frame.turn-flash {
+  animation: boardTurnFlash 0.65s ease-out forwards;
+}
+
 /* Basalt slate board grid styling */
 .board-grid {
   display: grid;
@@ -792,8 +800,10 @@ header p {
 }
 
 .pawn.active-move {
-  animation: pawnFloat 0.9s infinite alternate ease-in-out;
-  z-index: 25;
+  cursor: pointer;
+  animation: pawnFloat 0.9s infinite alternate ease-in-out, activePulse 1.2s infinite ease-in-out;
+  filter: drop-shadow(0 0 8px currentColor);
+  z-index: 15;
 }
 
 @keyframes pawnFloat {
@@ -805,6 +815,11 @@ header p {
     transform: translateY(-8px) scale(1.15); 
     box-shadow: 0 12px 16px rgba(0, 0, 0, 0.6), 0 0 12px currentColor;
   }
+}
+
+@keyframes activePulse {
+  0%, 100% { filter: drop-shadow(0 0 5px currentColor); }
+  50% { filter: drop-shadow(0 0 14px currentColor) brightness(1.2); }
 }
 
 /* realistic radial gradients for 3D glass droplets */
@@ -1682,6 +1697,42 @@ input:checked + .slider-switch:before {
   box-shadow: 0 0 8px rgba(223, 177, 91, 0.6);
 }
 
+.players-strip {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.player-strip-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+.player-strip-chip.active-turn {
+  border-color: var(--chip-color);
+  color: var(--chip-color);
+  background: rgba(0,0,0,0.5);
+  box-shadow: 0 0 10px var(--chip-color);
+}
+.player-strip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip-color);
+  box-shadow: 0 0 4px var(--chip-color);
+}
+
 @media (max-width: 850px) {
   body {
     justify-content: flex-start;
@@ -2185,6 +2236,9 @@ input:checked + .slider-switch:before {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+  }
+  .players-strip {
+    display: none;
   }
 }
 
