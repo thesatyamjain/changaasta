@@ -21,7 +21,8 @@
   <meta name="theme-color" content="#0b110e">
 
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="preview.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icon.png">
   <link rel="stylesheet" href="styles.css?v=1.0.5">
 </head>
 <body>
@@ -201,10 +202,17 @@
 
         <!-- Rolling Panel -->
         <div class="roll-panel glass-panel">
+          <!-- Toast Host Container -->
+          <div id="toast-host" class="toast-host"></div>
+
           <!-- Score panel (Three placeholders) -->
           <div class="roll-score-panel">
             <span class="roll-score-label">Score:</span>
-            <div class="roll-score-slots" id="score-slots-container"></div>
+            <div class="roll-score-slots">
+              <div class="roll-score-slot" id="score-slot-0"></div>
+              <div class="roll-score-slot" id="score-slot-1"></div>
+              <div class="roll-score-slot" id="score-slot-2"></div>
+            </div>
           </div>
 
           <!-- 3D Cowrie Shell Elements -->
@@ -398,9 +406,7 @@
 
   </div>
 
-  <div id="toast-host" class="toast-host"></div>
-
-  <script src="game.js"></script>
+  <script src="game.js?v=1.0.9"></script>
   <script src="favicon.js"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {

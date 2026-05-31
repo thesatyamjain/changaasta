@@ -439,7 +439,7 @@ const GameState = {
   players: [],
   currentPlayerIndex: 0,
   rollQueue: [],
-  turnRolls: [],
+  displayRolls: [],
   selectedRollIndex: null,
   consecutiveHighRolls: 0,
   gamePhase: 'setup', // 'setup', 'rolling', 'moving', 'ended'
@@ -506,7 +506,7 @@ const GameState = {
       players: JSON.parse(JSON.stringify(this.players)),
       currentPlayerIndex: this.currentPlayerIndex,
       rollQueue: [...this.rollQueue],
-      turnRolls: this.turnRolls ? JSON.parse(JSON.stringify(this.turnRolls)) : [],
+      displayRolls: JSON.parse(JSON.stringify(this.displayRolls)),
       selectedRollIndex: this.selectedRollIndex,
       consecutiveHighRolls: this.consecutiveHighRolls,
       gamePhase: this.gamePhase,
@@ -522,7 +522,7 @@ const GameState = {
     this.players = snap.players;
     this.currentPlayerIndex = snap.currentPlayerIndex;
     this.rollQueue = snap.rollQueue;
-    this.turnRolls = snap.turnRolls || [];
+    this.displayRolls = snap.displayRolls;
     this.selectedRollIndex = snap.selectedRollIndex;
     this.consecutiveHighRolls = snap.consecutiveHighRolls;
     this.gamePhase = snap.gamePhase;
@@ -545,7 +545,7 @@ const GameState = {
     this.logs = [];
     this.currentPlayerIndex = 0;
     this.rollQueue = [];
-    this.turnRolls = [];
+    this.displayRolls = [];
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
     this.undoSnapshot = null;
@@ -659,7 +659,7 @@ const GameState = {
       players: this.players,
       currentPlayerIndex: this.currentPlayerIndex,
       rollQueue: this.rollQueue,
-      turnRolls: this.turnRolls,
+      displayRolls: this.displayRolls,
       selectedRollIndex: this.selectedRollIndex,
       consecutiveHighRolls: this.consecutiveHighRolls,
       gamePhase: this.gamePhase,
@@ -684,7 +684,7 @@ const GameState = {
     this.players = payload.players;
     this.currentPlayerIndex = payload.currentPlayerIndex || 0;
     this.rollQueue = Array.isArray(payload.rollQueue) ? payload.rollQueue : [];
-    this.turnRolls = Array.isArray(payload.turnRolls) ? payload.turnRolls : (this.rollQueue || []).map(val => ({ value: val, used: false }));
+    this.displayRolls = Array.isArray(payload.displayRolls) ? payload.displayRolls : this.rollQueue.map(v => ({ value: v, used: false }));
     this.selectedRollIndex = payload.selectedRollIndex ?? null;
     this.consecutiveHighRolls = payload.consecutiveHighRolls || 0;
     this.gamePhase = payload.gamePhase === 'gameover' ? 'setup' : (payload.gamePhase || 'rolling');
@@ -822,7 +822,7 @@ const GameState = {
         }
         
         this.rollQueue.push(rollValue);
-        this.turnRolls.push({ value: rollValue, used: false });
+        this.displayRolls.push({ value: rollValue, used: false });
         this.updateRollQueueUI();
         this.saveGame();
 
@@ -836,7 +836,7 @@ const GameState = {
         }
       } else {
         this.rollQueue.push(rollValue);
-        this.turnRolls.push({ value: rollValue, used: false });
+        this.displayRolls.push({ value: rollValue, used: false });
         this.consecutiveHighRolls = 0;
         this.gamePhase = 'moving';
         this.selectedRollIndex = 0; // Default to first roll selection
@@ -883,65 +883,78 @@ const GameState = {
 
     if (queuePanel) {
       queuePanel.innerHTML = '';
-      if (this.rollQueue.length === 0) {
+      if (this.displayRolls.length === 0) {
         queuePanel.classList.add('hidden');
       } else {
         queuePanel.classList.remove('hidden');
       }
       
-      this.rollQueue.forEach((val, idx) => {
+      let rqIdx = 0;
+      this.displayRolls.forEach((dRoll) => {
         const badge = document.createElement('div');
-        badge.className = `queue-badge ${idx === this.selectedRollIndex ? 'selected' : ''}`;
-        badge.innerText = val;
-        badge.onclick = () => {
-          if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
-            synth.playToggle();
-            this.selectedRollIndex = idx;
-            this.updateRollQueueUI();
-            this.highlightValidPawns();
-          }
-        };
+        let currentRQIdx = -1;
+        if (!dRoll.used) {
+          currentRQIdx = rqIdx++;
+        }
+        badge.className = `queue-badge ${!dRoll.used && currentRQIdx === this.selectedRollIndex ? 'selected' : ''} ${dRoll.used ? 'used' : ''}`;
+        badge.innerText = dRoll.value;
+        if (!dRoll.used) {
+          badge.onclick = () => {
+            if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
+              synth.playToggle();
+              this.selectedRollIndex = currentRQIdx;
+              this.updateRollQueueUI();
+              this.highlightValidPawns();
+            }
+          };
+        }
         queuePanel.appendChild(badge);
       });
     }
 
     this.highlightValidPawns();
 
-    // Update the Score slots dynamically
-    const slotsContainer = document.getElementById('score-slots-container');
-    if (slotsContainer) {
-      slotsContainer.innerHTML = '';
-      
-      let unusedCount = 0;
-      this.turnRolls.forEach((roll, idx) => {
-        const slot = document.createElement('div');
-        slot.classList.add('roll-score-slot');
-        slot.innerText = roll.value;
-        slot.classList.add('filled');
-        
-        if (roll.used) {
-          slot.classList.add('used');
-        } else {
-          // Check if this active roll is currently selected
-          const activeIndex = unusedCount;
-          if (activeIndex === this.selectedRollIndex) {
-            slot.classList.add('selected');
+    // Update the Score placeholders
+    let slotRQIdx = 0;
+    for (let i = 0; i < 3; i++) {
+      const slot = document.getElementById(`score-slot-${i}`);
+      if (slot) {
+        const dRoll = this.displayRolls[i];
+        if (dRoll !== undefined) {
+          let currentRQIdx = -1;
+          if (!dRoll.used) {
+            currentRQIdx = slotRQIdx++;
           }
-          
-          slot.onclick = () => {
-            if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
-              synth.playToggle();
-              this.selectedRollIndex = activeIndex;
-              this.updateRollQueueUI();
-              this.highlightValidPawns();
+          slot.innerText = dRoll.value;
+          slot.classList.add('filled');
+          if (dRoll.used) {
+            slot.classList.add('used');
+            slot.classList.remove('selected');
+            slot.onclick = null;
+          } else {
+            slot.classList.remove('used');
+            if (currentRQIdx === this.selectedRollIndex) {
+              slot.classList.add('selected');
+            } else {
+              slot.classList.remove('selected');
             }
-          };
-          
-          unusedCount++;
+            slot.onclick = () => {
+              if (this.gamePhase === 'moving' && !this.getCurrentPlayer().isBot) {
+                synth.playToggle();
+                this.selectedRollIndex = currentRQIdx;
+                this.updateRollQueueUI();
+                this.highlightValidPawns();
+              }
+            };
+          }
+        } else {
+          slot.innerText = '';
+          slot.classList.remove('filled');
+          slot.classList.remove('selected');
+          slot.classList.remove('used');
+          slot.onclick = null;
         }
-        
-        slotsContainer.appendChild(slot);
-      });
+      }
     }
   },
 
@@ -1292,19 +1305,17 @@ const GameState = {
       });
     }
 
-    // Mark this move value as used in turnRolls
-    let unusedCount = 0;
-    for (let i = 0; i < this.turnRolls.length; i++) {
-      if (!this.turnRolls[i].used) {
-        if (unusedCount === this.selectedRollIndex) {
-          this.turnRolls[i].used = true;
+    // Remove this move value from queue
+    let unusedFound = 0;
+    for (let i = 0; i < this.displayRolls.length; i++) {
+      if (!this.displayRolls[i].used) {
+        if (unusedFound === this.selectedRollIndex) {
+          this.displayRolls[i].used = true;
           break;
         }
-        unusedCount++;
+        unusedFound++;
       }
     }
-
-    // Remove this move value from queue
     this.rollQueue.splice(this.selectedRollIndex, 1);
     this.selectedRollIndex = this.rollQueue.length > 0 ? 0 : null;
 
@@ -1384,7 +1395,7 @@ const GameState = {
     if (this.gamePhase === 'gameover' || this.gamePhase === 'setup') return;
 
     this.rollQueue = [];
-    this.turnRolls = [];
+    this.displayRolls = [];
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
     this.undoSnapshot = null; // Clear undo on turn end
@@ -3025,8 +3036,8 @@ const ScreenEngine = {
     let boardSize = 0;
     
     if (vWidth <= 850) {
-      // Mobile: Reserve 385px for UI and Yards
-      boardSize = Math.min(vHeight - 385, vWidth * 0.92);
+      // Mobile: Reserve 310px for UI and Yards
+      boardSize = Math.min(vHeight - 310, vWidth * 0.92);
     } else if (vWidth <= 1200) {
       // Tablet: Reserve 200px for UI and Yards
       boardSize = Math.min(vHeight - 200, vWidth * 0.9);

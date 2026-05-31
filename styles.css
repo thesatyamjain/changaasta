@@ -983,15 +983,12 @@ header p {
 }
 
 .roll-score-slot.used {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.1) !important;
-  color: rgba(255, 255, 255, 0.25) !important;
-  text-decoration: line-through;
-  box-shadow: none !important;
-  cursor: not-allowed;
-  animation: none !important;
-  transform: none !important;
-  opacity: 0.55;
+  background: rgba(128, 128, 128, 0.2);
+  border: 1.5px dashed rgba(128, 128, 128, 0.5);
+  color: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.8;
 }
 
 /* Roll Shells Section */
@@ -1221,6 +1218,20 @@ header p {
     0 0 25px rgba(255, 208, 43, 0.6),
     inset 0 1px 2px rgba(255, 255, 255, 0.5);
   transform: translateY(-4px) scale(1.15);
+}
+
+.queue-badge.used {
+  background: rgba(128, 128, 128, 0.2);
+  border: 2px dashed rgba(128, 128, 128, 0.5);
+  color: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.8;
+}
+
+.queue-badge.used:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 @keyframes popBadge {
@@ -1730,9 +1741,7 @@ input:checked + .slider-switch:before {
     margin: 0;
     align-items: center;
     width: 100vw;
-    height: 100dvh;
-    position: relative;
-    overflow: hidden;
+    min-height: auto;
     justify-content: flex-start;
   }
 
@@ -1761,8 +1770,8 @@ input:checked + .slider-switch:before {
   }
 
   .board-grid.size-5, .board-grid.size-7 {
-    width: var(--dynamic-board-size, min(92vw, calc(100dvh - 385px)));
-    height: var(--dynamic-board-size, min(92vw, calc(100dvh - 385px)));
+    width: var(--dynamic-board-size, min(92vw, calc(100dvh - 310px)));
+    height: var(--dynamic-board-size, min(92vw, calc(100dvh - 310px)));
     min-width: 250px;
     min-height: 250px;
   }
@@ -1788,11 +1797,11 @@ input:checked + .slider-switch:before {
     height: 20px;
   }
 
-  /* Reposition pockets above and below the board */
-  .yard-pocket.top { top: -75px; left: 75%; transform: translateX(-50%); }
-  .yard-pocket.left { left: 25%; top: -75px; transform: translateX(-50%); margin: 0; }
-  .yard-pocket.bottom { bottom: -75px; left: 25%; transform: translateX(-50%); margin: 0; }
-  .yard-pocket.right { right: auto; top: auto; left: 75%; bottom: -75px; transform: translateX(-50%); margin: 0; }
+  /* Reposition pockets in one row above the board */
+  .yard-pocket.bottom { top: -75px; bottom: auto; left: 12.5%; transform: translateX(-50%); margin: 0; }
+  .yard-pocket.left { top: -75px; left: 37.5%; transform: translateX(-50%); margin: 0; }
+  .yard-pocket.top { top: -75px; left: 62.5%; transform: translateX(-50%); }
+  .yard-pocket.right { top: -75px; bottom: auto; left: 87.5%; right: auto; transform: translateX(-50%); margin: 0; }
 
   /* Dock controls to bottom */
   .sidebar {
@@ -1877,9 +1886,9 @@ input:checked + .slider-switch:before {
   .roll-score-panel {
     position: absolute;
     bottom: calc(100% + 8px);
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
+    right: 0;
+    left: auto;
+    transform: none;
     width: auto;
     background: rgba(6, 10, 8, 0.9);
     border: 1.5px solid var(--gold-chalk);
@@ -2109,7 +2118,32 @@ input:checked + .slider-switch:before {
   }
 
   .toast-host {
-    top: 70px;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: auto;
+    top: auto;
+    transform: none;
+    width: auto;
+    max-width: 50vw;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 6px;
+    z-index: 1002;
+    pointer-events: none;
+  }
+
+  .game-toast {
+    padding: 7px 12px;
+    font-size: 0.76rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
 }
 
@@ -2443,12 +2477,6 @@ body.light-theme .roll-score-slot.selected {
     0 0 18px rgba(255, 208, 43, 0.6),
     inset 0 1px 2px rgba(255, 255, 255, 0.55);
   transform: scale(1.1);
-}
-
-body.light-theme .roll-score-slot.used {
-  background: rgba(0, 0, 0, 0.04) !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
-  color: rgba(0, 0, 0, 0.25) !important;
 }
 
 body.light-theme .header-logo-canvas {

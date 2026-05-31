@@ -1,4 +1,4 @@
-const CACHE_NAME = 'changa-asta-v2';
+const CACHE_NAME = 'changa-asta-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,7 +6,9 @@ const APP_SHELL = [
   './game.js',
   './favicon.js',
   './manifest.json',
-  './preview.png'
+  './preview.png',
+  './icon.png',
+  './apple-touch-icon.png'
 ];
 
 self.addEventListener('install', event => {
