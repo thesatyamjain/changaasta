@@ -23,7 +23,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icon.png">
-  <link rel="stylesheet" href="styles.css?v=1.0.5">
+  <link rel="stylesheet" href="styles.css?v=1.0.6">
 </head>
 <body>
 
@@ -150,9 +150,10 @@
         <!-- Advanced Rules Toggles -->
         <div class="settings-group settings-rules slide-up delay-4">
           <span class="settings-label">Niyam Chunein:</span>
-          <div class="toggle-options">
-            <button class="btn-toggle active" id="rule-gatti">Gatti Banana <span class="btn-subtext">Blockades</span></button>
-            <button class="btn-toggle" id="rule-spawn">Ghar Se Nikalna <span class="btn-subtext">4/8/6/12 Par</span></button>
+          <div class="toggle-options" style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button class="btn-toggle active" id="rule-gatti" style="flex: 1 1 120px;">Gatti Banana <span class="btn-subtext">Blockades</span></button>
+            <button class="btn-toggle" id="rule-spawn" style="flex: 1 1 120px;">Ghar Se Nikalna <span class="btn-subtext">4/8/6/12 Par</span></button>
+            <button class="btn-toggle" id="rule-skills" style="flex: 1 1 120px;">Kshamtaen <span class="btn-subtext">Special Skills</span></button>
           </div>
         </div>
         </div>
@@ -234,6 +235,28 @@
           </div>
 
           <button id="btn-roll" class="btn-primary" style="width: 100%;">KAUDI FEKEIN</button>
+
+          <!-- Skills Selection Panel (Hidden unless rule-skills is active) -->
+          <div id="skills-panel" class="skills-panel hidden">
+            <div class="skills-header">
+              <span class="skills-title">💥 Kshamtaen (Skills)</span>
+              <span class="skills-charges" id="skills-charges-display">✨ 3 / 3</span>
+            </div>
+            <div class="skills-grid">
+              <button class="btn-skill" id="skill-reroll" onclick="window.useSkill('reroll')" title="Reroll (Cost: 1 Charge)">
+                <span class="skill-icon">🎲</span>
+                <span class="skill-text">Reroll</span>
+              </button>
+              <button class="btn-skill" id="skill-shield" onclick="window.useSkill('shield')" title="Shield Pawn (Cost: 1 Charge)">
+                <span class="skill-icon">🛡️</span>
+                <span class="skill-text">Shield</span>
+              </button>
+              <button class="btn-skill" id="skill-teleport" onclick="window.useSkill('teleport')" title="Teleport to Safe Cell (Cost: 2 Charges)">
+                <span class="skill-icon">🌀</span>
+                <span class="skill-text">Teleport</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Utilities -->
@@ -406,7 +429,7 @@
 
   </div>
 
-  <script src="game.js?v=1.0.9"></script>
+  <script src="game.js?v=1.0.10"></script>
   <script src="favicon.js"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {

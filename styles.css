@@ -1750,7 +1750,7 @@ input:checked + .slider-switch:before {
   .board-outer-container {
     position: absolute;
     top: 55px;
-    bottom: 145px;
+    bottom: var(--board-outer-bottom, 145px);
     left: 0;
     right: 0;
     padding: 0;
@@ -1760,6 +1760,7 @@ input:checked + .slider-switch:before {
     align-items: center;
     margin: 0;
     transform: none;
+    transition: bottom 0.3s ease;
   }
 
   .board-frame {
@@ -1795,6 +1796,25 @@ input:checked + .slider-switch:before {
   .pawn {
     width: 20px;
     height: 20px;
+    pointer-events: none; /* Prevent static/enemy pawns from blocking clicks */
+  }
+
+  /* Expanded touch target for mobile */
+  .pawn::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: -12px;
+    right: -12px;
+    bottom: -12px;
+    z-index: 1;
+  }
+
+  /* Re-enable pointer events for interactable pawns only */
+  .pawn.active-move,
+  .pawn.pawn-skill-target,
+  .yard-pocket .pawn {
+    pointer-events: auto;
   }
 
   /* Reposition pockets in one row above the board */
@@ -2069,15 +2089,25 @@ input:checked + .slider-switch:before {
   }
 
   .utility-controls .btn-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 0.9rem;
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
   }
 
   .utility-controls .btn-primary {
-    font-size: 0.78rem !important;
-    padding: 6px 12px !important;
-    border-radius: 8px;
+    font-size: 0.85rem !important;
+    padding: 10px 16px !important;
+    border-radius: 12px;
+  }
+
+  /* Slider touch target sizing */
+  .settings-slider::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+  }
+  .settings-slider::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
   }
 
   /* Lobby collapse and optimization */
@@ -2090,6 +2120,17 @@ input:checked + .slider-switch:before {
   .setup-title { font-size: 1.35rem; padding-bottom: 8px; margin-bottom: 0; }
   #setup-screen .btn-primary { padding: 10px 20px; font-size: 0.95rem; border-radius: 10px; }
   .player-setup-grid { grid-template-columns: 1fr 1fr; gap: 5px; }
+
+  /* Setup card stacking on narrow screens */
+  @media (max-width: 480px) {
+    .player-setup-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .player-setup-card {
+      padding: 10px;
+    }
+  }
   .player-setup-card { padding: 8px; gap: 4px; border-radius: 10px; }
   .player-setup-card .card-header { gap: 8px; }
   .player-setup-card .color-indicator { width: 18px; height: 18px; }
@@ -2443,6 +2484,31 @@ body.light-theme .yard-progress-label {
   .yard-progress-label {
     font-size: 0.68rem;
   }
+
+  /* Compact Skills Panel layout on Mobile */
+  .skills-panel {
+    margin-top: 8px;
+    padding-top: 8px;
+    gap: 6px;
+  }
+
+  .skills-header {
+    margin-bottom: 0px;
+  }
+
+  .btn-skill {
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .btn-skill .skill-icon {
+    font-size: 1.1rem;
+  }
+
+  .btn-skill .skill-text {
+    font-size: 0.65rem;
+  }
 }
 
 /* Light Theme Score Panel Overrides */
@@ -2487,4 +2553,188 @@ body.light-theme .header-logo-canvas {
 @keyframes logoGlowLight {
   0% { filter: drop-shadow(0 4px 10px rgba(160, 115, 80, 0.3)); }
   100% { filter: drop-shadow(0 4px 18px rgba(160, 115, 80, 0.6)); }
+}
+
+/* --- Special Skills UI Panel and Button Styles --- */
+.skills-panel {
+  width: 100%;
+  margin-top: 14px;
+  border-top: 1.5px solid rgba(223, 177, 91, 0.15);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slideDownIn 0.3s ease-out;
+}
+
+@keyframes slideDownIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.skills-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.skills-title {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  color: var(--gold-chalk);
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.skills-charges {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-light);
+  background: rgba(223, 177, 91, 0.12);
+  padding: 3px 9px;
+  border-radius: 99px;
+  border: 1px solid rgba(223, 177, 91, 0.28);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.btn-skill {
+  background: rgba(16, 25, 20, 0.6);
+  border: 1px solid rgba(223, 177, 91, 0.15);
+  color: var(--text-muted);
+  padding: 8px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: var(--transition-smooth);
+}
+
+.btn-skill:hover:not(:disabled) {
+  background: rgba(223, 177, 91, 0.1);
+  border-color: var(--gold-chalk);
+  color: var(--text-light);
+  box-shadow: 0 4px 12px rgba(223, 177, 91, 0.12);
+}
+
+.btn-skill:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.btn-skill .skill-icon {
+  font-size: 1.25rem;
+  transition: transform 0.2s ease;
+}
+
+.btn-skill:hover:not(:disabled) .skill-icon {
+  transform: scale(1.15) rotate(5deg);
+}
+
+.btn-skill .skill-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+/* Active Activation Glow state */
+.btn-skill.active-skill {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: #00f0ff;
+  color: #00f0ff;
+  box-shadow: 
+    0 0 12px rgba(0, 240, 255, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.15);
+  animation: skillActivePulse 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes skillActivePulse {
+  0% { transform: scale(1); box-shadow: 0 0 8px rgba(0, 240, 255, 0.2); }
+  100% { transform: scale(1.04); box-shadow: 0 0 16px rgba(0, 240, 255, 0.45); }
+}
+
+/* Shield visual effects */
+.pawn.shielded {
+  box-shadow: 
+    0 0 0 2px #00f0ff,
+    0 0 12px rgba(0, 240, 255, 0.8),
+    inset 0 0 8px rgba(0, 240, 255, 0.6) !important;
+  border-color: #00f0ff !important;
+}
+
+.shield-icon-overlay {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 9px;
+  background: #060a08;
+  border: 1px solid #00f0ff;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.6);
+  z-index: 22;
+  pointer-events: none;
+}
+
+/* Light Theme overrides for skills */
+body.light-theme .skills-panel {
+  border-top-color: rgba(160, 115, 80, 0.2);
+}
+
+body.light-theme .skills-title {
+  color: #a07350;
+}
+
+body.light-theme .skills-charges {
+  color: #0b110e;
+  background: rgba(160, 115, 80, 0.1);
+  border-color: rgba(160, 115, 80, 0.3);
+}
+
+body.light-theme .btn-skill {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(160, 115, 80, 0.2);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+body.light-theme .btn-skill:hover:not(:disabled) {
+  background: rgba(160, 115, 80, 0.08);
+  border-color: #a07350;
+  color: #0b110e;
+  box-shadow: 0 4px 12px rgba(160, 115, 80, 0.15);
+}
+
+body.light-theme .shield-icon-overlay {
+  background: #f4f6f4;
+}
+
+/* Pulsating target outline for skills deployment */
+.pawn.pawn-skill-target {
+  cursor: pointer;
+  animation: pawnPulse 1.2s infinite alternate;
+}
+@keyframes pawnPulse {
+  from {
+    transform: scale(1);
+    box-shadow: 0 0 0 3px #ffd700, 0 0 8px #ffd700;
+  }
+  to {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 5px #ffd700, 0 0 15px #ffd700;
+  }
 }

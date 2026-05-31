@@ -460,8 +460,10 @@ const GameState = {
   // Custom toggles
   rules: {
     gattiEnabled: true,
-    spawnRequired: false
+    spawnRequired: false,
+    skillsEnabled: false
   },
+  skillsInteraction: null, // Track if human is currently selecting a pawn for a skill ('shield' or 'teleport')
 
   settings: {
     theme: 'dark',
@@ -550,6 +552,7 @@ const GameState = {
     this.consecutiveHighRolls = 0;
     this.undoSnapshot = null;
     this.isRollingAnim = false;
+    this.skillsInteraction = null;
     this.stats = {
       turns: 1,
       rolls: 0,
@@ -574,7 +577,8 @@ const GameState = {
           id: i,
           color: p.color,
           pathIndex: -1, // -1 means in yard / inactive
-          isGatti: false
+          isGatti: false,
+          hasShield: false
         });
       }
       return {
@@ -583,7 +587,10 @@ const GameState = {
         isBot: p.isBot,
         botDifficulty: p.botDifficulty || botDifficulty,
         hasKilled: false, // Must be true to enter inner rings
-        pawns: pawns
+        pawns: pawns,
+        skills: {
+          charges: 3
+        }
       };
     });
 
@@ -694,6 +701,7 @@ const GameState = {
     this.logs = [];
     this.winner = null;
     this.isRollingAnim = false;
+    this.skillsInteraction = null;
 
     const colors = ['red', 'green', 'yellow', 'blue'];
     this.paths = {};
@@ -977,6 +985,240 @@ const GameState = {
     });
   },
 
+  updateSkillsUI() {
+    const panel = document.getElementById('skills-panel');
+    if (!panel) return;
+
+    if (!this.rules.skillsEnabled || this.gamePhase === 'setup' || this.gamePhase === 'ended') {
+      panel.classList.add('hidden');
+      return;
+    }
+    panel.classList.remove('hidden');
+
+    const curPlayer = this.getCurrentPlayer();
+    const charges = curPlayer.skills?.charges ?? 0;
+
+    const chargesDisplay = document.getElementById('skills-charges-display');
+    if (chargesDisplay) {
+      chargesDisplay.textContent = `✨ ${charges} / 3`;
+    }
+
+    const btnReroll = document.getElementById('skill-reroll');
+    const btnShield = document.getElementById('skill-shield');
+    const btnTeleport = document.getElementById('skill-teleport');
+
+    // Remove active class from buttons first
+    [btnReroll, btnShield, btnTeleport].forEach(btn => {
+      if (btn) btn.classList.remove('active');
+    });
+
+    if (this.skillsInteraction === 'shield' && btnShield) btnShield.classList.add('active');
+    if (this.skillsInteraction === 'teleport' && btnTeleport) btnTeleport.classList.add('active');
+
+    // Determine button disabled states
+    const isBot = curPlayer.isBot;
+    
+    // Reroll: cost 1 charge, gamePhase must be 'moving', and no moves made yet (displayRolls all unused)
+    const hasUnusedRolls = this.displayRolls.length > 0 && this.displayRolls.every(r => !r.used);
+    const canReroll = !isBot && charges >= 1 && this.gamePhase === 'moving' && hasUnusedRolls && !this.isRollingAnim;
+    if (btnReroll) btnReroll.disabled = !canReroll;
+
+    // Shield: cost 1 charge, gamePhase rolling or moving, must have at least one pawn on board that is not finished and not already shielded
+    const goalIndex = this.paths[curPlayer.color].length - 1;
+    const hasShieldablePawn = curPlayer.pawns.some(p => p.pathIndex !== -1 && p.pathIndex < goalIndex && !p.hasShield);
+    const canShield = !isBot && charges >= 1 && (this.gamePhase === 'rolling' || this.gamePhase === 'moving') && hasShieldablePawn;
+    if (btnShield) btnShield.disabled = !canShield;
+
+    // Teleport: cost 2 charges, gamePhase must be 'moving', must have selectedRollIndex, and at least one pawn on board
+    const hasTeleportablePawn = curPlayer.pawns.some(p => p.pathIndex !== -1 && p.pathIndex < goalIndex);
+    const canTeleport = !isBot && charges >= 2 && this.gamePhase === 'moving' && this.selectedRollIndex !== null && hasTeleportablePawn;
+    if (btnTeleport) btnTeleport.disabled = !canTeleport;
+  },
+
+  highlightSkillTargetPawns() {
+    // Clear existing target highlights
+    document.querySelectorAll('.pawn-skill-target').forEach(p => p.classList.remove('pawn-skill-target'));
+
+    if (!this.skillsInteraction) return;
+
+    const player = this.getCurrentPlayer();
+    const goalIndex = this.paths[player.color].length - 1;
+
+    player.pawns.forEach(pawn => {
+      let eligible = false;
+      if (this.skillsInteraction === 'shield') {
+        eligible = (pawn.pathIndex !== -1 && pawn.pathIndex < goalIndex && !pawn.hasShield);
+      } else if (this.skillsInteraction === 'teleport') {
+        eligible = (pawn.pathIndex !== -1 && pawn.pathIndex < goalIndex);
+      }
+
+      if (eligible) {
+        const pEl = document.querySelector(`.pawn[data-player-index="${this.currentPlayerIndex}"][data-pawn-id="${pawn.id}"]`);
+        if (pEl) {
+          pEl.classList.add('pawn-skill-target');
+        }
+      }
+    });
+  },
+
+  executeSkillOnPawn(pawnId) {
+    const player = this.getCurrentPlayer();
+    const pawn = player.pawns.find(p => p.id === pawnId);
+    if (!pawn) return;
+
+    if (this.skillsInteraction === 'shield') {
+      const goalIndex = this.paths[player.color].length - 1;
+      if (pawn.pathIndex === -1 || pawn.pathIndex >= goalIndex || pawn.hasShield) {
+        showToast('Invalid target for Shield', 'warn');
+        return;
+      }
+      
+      // Deduct charge
+      player.skills.charges -= 1;
+      pawn.hasShield = true;
+      this.addLog(player.name, `${pawn.isGatti ? 'Gatti' : 'Goti'} par Kavach (🛡️) lagaya!`);
+      
+      if (this.rules.gattiEnabled && pawn.isGatti) {
+        const partner = player.pawns.find(pp =>
+          pp.id !== pawn.id &&
+          pp.isGatti &&
+          pp.pathIndex === pawn.pathIndex
+        );
+        if (partner) {
+          partner.hasShield = true;
+        }
+      }
+
+      synth.playMove();
+      this.skillsInteraction = null;
+      this.renderBoard();
+      this.updateSkillsUI();
+      this.saveGame();
+    } 
+    else if (this.skillsInteraction === 'teleport') {
+      if (this.selectedRollIndex === null || this.selectedRollIndex >= this.rollQueue.length) {
+        showToast('Please select a roll value to consume first!', 'warn');
+        return;
+      }
+      const goalIndex = this.paths[player.color].length - 1;
+      if (pawn.pathIndex === -1 || pawn.pathIndex >= goalIndex) {
+        showToast('Invalid target for Teleport', 'warn');
+        return;
+      }
+
+      // Find next safe cell
+      const path = this.paths[player.color];
+      const firstInnerIndex = this.gridSize === 5 ? 16 : 24;
+      let foundIndex = -1;
+      for (let step = 1; step < path.length; step++) {
+        let checkIdx = pawn.pathIndex + step;
+        if (!player.hasKilled && pawn.pathIndex < firstInnerIndex) {
+          if (checkIdx >= firstInnerIndex) {
+            checkIdx = checkIdx % firstInnerIndex;
+          }
+        }
+        if (checkIdx >= path.length) {
+          break;
+        }
+        const cell = path[checkIdx];
+        const activeColors = this.players.map(p => p.color);
+        const isSafe = GameEngine.isSafeCell(this.gridSize, cell.r, cell.c, activeColors);
+        if (isSafe) {
+          foundIndex = checkIdx;
+          break;
+        }
+      }
+
+      if (foundIndex === -1) {
+        showToast('No safe cell found ahead!', 'warn');
+        return;
+      }
+
+      // Deduct charges
+      player.skills.charges -= 2;
+
+      // Track old DOM rects for moving pawns for WAAPI animations
+      this.animatingPawns = [];
+      let partner = null;
+      if (pawn.isGatti) {
+        partner = player.pawns.find(other =>
+          other.id !== pawn.id &&
+          other.isGatti &&
+          other.pathIndex === pawn.pathIndex
+        );
+      }
+      const movingPawns = partner ? [pawn, partner] : [pawn];
+      
+      movingPawns.forEach(p => {
+        const pEl = document.querySelector(`.pawn[data-player-index="${this.currentPlayerIndex}"][data-pawn-id="${p.id}"]`);
+        if (pEl) {
+          this.animatingPawns.push({
+            playerIdx: this.currentPlayerIndex,
+            pawnId: p.id,
+            oldRect: pEl.getBoundingClientRect()
+          });
+        }
+      });
+
+      // Move pawns
+      movingPawns.forEach(p => {
+        p.pathIndex = foundIndex;
+        p.hasShield = false;
+      });
+
+      // Consume the selected roll value from queue
+      let unusedFound = 0;
+      for (let i = 0; i < this.displayRolls.length; i++) {
+        if (!this.displayRolls[i].used) {
+          if (unusedFound === this.selectedRollIndex) {
+            this.displayRolls[i].used = true;
+            break;
+          }
+          unusedFound++;
+        }
+      }
+      this.rollQueue.splice(this.selectedRollIndex, 1);
+      this.selectedRollIndex = this.rollQueue.length > 0 ? 0 : null;
+
+      this.addLog(player.name, `${pawn.isGatti ? 'Gatti' : 'Goti'} ko safe cell par Teleport (🌀) kiya!`);
+      synth.playMove();
+
+      this.skillsInteraction = null;
+
+      // Check Victory
+      if (this.checkWinCondition(player)) {
+        this.triggerVictory(player);
+        return;
+      }
+
+      this.renderBoard();
+      this.triggerMoveAnimations();
+      this.updateRollQueueUI();
+      this.updateSkillsUI();
+      
+      if (this.rollQueue.length === 0) {
+        this.saveGame();
+        this.endTurn();
+      } else if (!this.hasAnyValidMoves()) {
+        const canReroll = this.rules.skillsEnabled && player.skills && player.skills.charges > 0;
+        if (canReroll) {
+          this.addLog('System', `${player.name} ke paas chalne ke liye goti nahi hai, par wo Reroll kar sakte hain.`);
+          showToast('No valid moves! Use Reroll or End Turn.', 'warn');
+          this.saveGame();
+        } else {
+          this.addLog('System', `Koi chalne layak goti nahi hai.`);
+          showToast('No valid move', 'warn');
+          this.saveGame();
+          setTimeout(() => {
+            if (this.gamePhase !== 'gameover') this.endTurn();
+          }, 1500);
+        }
+      } else {
+        this.saveGame();
+      }
+    }
+  },
+
   isValidPawnMove(pawn, value, isGroupMove = null) {
     // Yard to board spawn check
     if (pawn.pathIndex === -1) {
@@ -1165,6 +1407,7 @@ const GameState = {
     const movingPawns = partner ? [pawn, partner] : [pawn];
     
     movingPawns.forEach(p => {
+      p.hasShield = false;
       const pEl = document.querySelector(`.pawn[data-player-index="${this.currentPlayerIndex}"][data-pawn-id="${p.id}"]`);
       if (pEl) {
         this.animatingPawns.push({
@@ -1252,6 +1495,9 @@ const GameState = {
 
           const oppCell = this.paths[oppPawn.color][oppPawn.pathIndex];
           if (oppCell.r === targetCell.r && oppCell.c === targetCell.c) {
+            if (oppPawn.hasShield) {
+              continue; // Protected by Shield!
+            }
 
             // Rules check:
             if (this.rules.gattiEnabled) {
@@ -1399,6 +1645,7 @@ const GameState = {
     this.selectedRollIndex = null;
     this.consecutiveHighRolls = 0;
     this.undoSnapshot = null; // Clear undo on turn end
+    this.skillsInteraction = null;
     const undoBtn = document.getElementById('btn-undo');
     if (undoBtn) undoBtn.disabled = true;
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
@@ -1590,13 +1837,13 @@ const GameState = {
     // Deep clone state for simulation
     const getInitialSimState = () => {
       return {
-        pawns: player.pawns.map(p => ({ id: p.id, pathIndex: p.pathIndex, isGatti: p.isGatti })),
+        pawns: player.pawns.map(p => ({ id: p.id, pathIndex: p.pathIndex, isGatti: p.isGatti, hasShield: p.hasShield })),
         hasKilled: player.hasKilled,
         opponents: this.players
           .filter((_, idx) => idx !== this.currentPlayerIndex)
           .map(opp => ({
             color: opp.color,
-            pawns: opp.pawns.map(p => ({ id: p.id, pathIndex: p.pathIndex, isGatti: p.isGatti }))
+            pawns: opp.pawns.map(p => ({ id: p.id, pathIndex: p.pathIndex, isGatti: p.isGatti, hasShield: p.hasShield }))
           }))
       };
     };
@@ -1749,6 +1996,7 @@ const GameState = {
           for (const oppP of opp.pawns) {
             if (capturedThisOppSim) break;
             if (oppP.pathIndex === -1) continue;
+            if (oppP.hasShield) continue; // Protected by Shield!
             const oppCell = oppPath[oppP.pathIndex];
             if (oppCell.r === targetCell.r && oppCell.c === targetCell.c) {
               if (this.rules.gattiEnabled) {
@@ -1946,6 +2194,203 @@ const GameState = {
       return { score: bestScore, sequence: bestSeq };
     };
 
+    // Bot Skill Deployment Checks
+    if (this.rules.skillsEnabled && player.skills && player.skills.charges > 0) {
+      const charges = player.skills.charges;
+      
+      // 1. Reroll check:
+      // If no valid moves OR (only one roll value and it is 1 or 2 with 50% chance)
+      const hasUnusedRolls = this.displayRolls.length > 0 && this.displayRolls.every(r => !r.used);
+      if (hasUnusedRolls && this.gamePhase === 'moving') {
+        const noMoves = !this.hasAnyValidMoves();
+        const lowSingleRoll = this.rollQueue.length === 1 && (this.rollQueue[0] === 1 || this.rollQueue[0] === 2);
+        if (noMoves || (lowSingleRoll && Math.random() < 0.5)) {
+          // Use Reroll!
+          player.skills.charges -= 1;
+          this.rollQueue = [];
+          this.displayRolls = [];
+          this.consecutiveHighRolls = 0;
+          this.selectedRollIndex = null;
+          this.gamePhase = 'rolling';
+          
+          this.addLog(player.name, 'ne Reroll Kshamta ka upyog kiya (🎲)!');
+          showToast(`${player.name} used Reroll`, 'good');
+          
+          this.renderBoard();
+          this.updateRollQueueUI();
+          this.updateSkillsUI();
+          this.saveGame();
+          
+          setTimeout(() => {
+            if (this.gamePhase === 'rolling') this.rollCowries();
+          }, this.getBotDelay('roll'));
+          return;
+        }
+      }
+
+      // 2. Shield check:
+      // Cost 1 charge.
+      if (charges >= 1) {
+        const simState = getInitialSimState();
+        const threatMap = buildThreatMap(simState);
+        
+        let highestThreatPawn = null;
+        let highestThreatScore = 0;
+        
+        player.pawns.forEach(pawn => {
+          if (pawn.pathIndex !== -1 && pawn.pathIndex < goalIndex && !pawn.hasShield) {
+            const threatScore = threatMap[pawn.pathIndex] || 0;
+            if (threatScore > highestThreatScore) {
+              highestThreatScore = threatScore;
+              highestThreatPawn = pawn;
+            }
+          }
+        });
+        
+        // If threat is significant (e.g. >= 70), shield the pawn
+        if (highestThreatPawn && highestThreatScore >= 70) {
+          player.skills.charges -= 1;
+          highestThreatPawn.hasShield = true;
+          this.addLog(player.name, `${highestThreatPawn.isGatti ? 'Gatti' : 'Goti'} par Kavach (🛡️) lagaya!`);
+          showToast(`${player.name} shielded a pawn`, 'good');
+          
+          if (this.rules.gattiEnabled && highestThreatPawn.isGatti) {
+            const partner = player.pawns.find(pp =>
+              pp.id !== highestThreatPawn.id &&
+              pp.isGatti &&
+              pp.pathIndex === highestThreatPawn.pathIndex
+            );
+            if (partner) {
+              partner.hasShield = true;
+            }
+          }
+          
+          this.renderBoard();
+          this.updateSkillsUI();
+          this.saveGame();
+          
+          // Continue bot move execution after a short delay
+          setTimeout(() => {
+            this.makeBotMove();
+          }, this.getBotDelay('submove'));
+          return;
+        }
+      }
+
+      // 3. Teleport check:
+      // Cost 2 charges.
+      if (charges >= 2 && this.selectedRollIndex !== null && this.rollQueue.length > 0) {
+        let bestTeleportPawn = null;
+        let maxLeapDistance = 0;
+        let bestTargetIdx = -1;
+        
+        player.pawns.forEach(pawn => {
+          if (pawn.pathIndex !== -1 && pawn.pathIndex < goalIndex) {
+            // Calculate next safe index
+            const path = this.paths[player.color];
+            let foundIndex = -1;
+            for (let step = 1; step < path.length; step++) {
+              let checkIdx = pawn.pathIndex + step;
+              if (!player.hasKilled && pawn.pathIndex < firstInnerIndex) {
+                if (checkIdx >= firstInnerIndex) {
+                  checkIdx = checkIdx % firstInnerIndex;
+                }
+              }
+              if (checkIdx >= path.length) {
+                break;
+              }
+              const cell = path[checkIdx];
+              const isSafe = GameEngine.isSafeCell(this.gridSize, cell.r, cell.c, activeColors);
+              if (isSafe) {
+                foundIndex = checkIdx;
+                break;
+              }
+            }
+            
+            if (foundIndex !== -1) {
+              const distance = foundIndex - pawn.pathIndex;
+              // We want to leap if it's a long distance (>= 6 squares ahead)
+              if (distance >= 6 && distance > maxLeapDistance) {
+                maxLeapDistance = distance;
+                bestTeleportPawn = pawn;
+                bestTargetIdx = foundIndex;
+              }
+            }
+          }
+        });
+        
+        if (bestTeleportPawn && bestTargetIdx !== -1) {
+          player.skills.charges -= 2;
+          
+          // Animate and teleport
+          this.animatingPawns = [];
+          let partner = null;
+          if (bestTeleportPawn.isGatti) {
+            partner = player.pawns.find(other =>
+              other.id !== bestTeleportPawn.id &&
+              other.isGatti &&
+              other.pathIndex === bestTeleportPawn.pathIndex
+            );
+          }
+          const movingPawns = partner ? [bestTeleportPawn, partner] : [bestTeleportPawn];
+          
+          movingPawns.forEach(p => {
+            const pEl = document.querySelector(`.pawn[data-player-index="${this.currentPlayerIndex}"][data-pawn-id="${p.id}"]`);
+            if (pEl) {
+              this.animatingPawns.push({
+                playerIdx: this.currentPlayerIndex,
+                pawnId: p.id,
+                oldRect: pEl.getBoundingClientRect()
+              });
+            }
+          });
+          
+          movingPawns.forEach(p => {
+            p.pathIndex = bestTargetIdx;
+            p.hasShield = false;
+          });
+          
+          // Consume selected roll value
+          let unusedFound = 0;
+          for (let i = 0; i < this.displayRolls.length; i++) {
+            if (!this.displayRolls[i].used) {
+              if (unusedFound === this.selectedRollIndex) {
+                this.displayRolls[i].used = true;
+                break;
+              }
+              unusedFound++;
+            }
+          }
+          this.rollQueue.splice(this.selectedRollIndex, 1);
+          this.selectedRollIndex = this.rollQueue.length > 0 ? 0 : null;
+          
+          this.addLog(player.name, `${bestTeleportPawn.isGatti ? 'Gatti' : 'Goti'} ko safe cell par Teleport (🌀) kiya!`);
+          showToast(`${player.name} teleported a pawn`, 'good');
+          
+          if (this.checkWinCondition(player)) {
+            this.triggerVictory(player);
+            return;
+          }
+          
+          this.renderBoard();
+          this.triggerMoveAnimations();
+          this.updateRollQueueUI();
+          this.updateSkillsUI();
+          
+          if (this.rollQueue.length === 0) {
+            this.saveGame();
+            this.endTurn();
+          } else {
+            this.saveGame();
+            setTimeout(() => {
+              this.makeBotMove();
+            }, this.getBotDelay('move'));
+          }
+          return;
+        }
+      }
+    }
+
     const difficulty = player.botDifficulty || this.botDifficulty || 'normal';
     const initialSimState = getInitialSimState();
 
@@ -2132,11 +2577,20 @@ const GameState = {
       document.querySelectorAll('.valid-target').forEach(c => c.classList.remove('valid-target'));
       const pIdx = parseInt(pawnEl.getAttribute('data-player-index'));
       const pId = parseInt(pawnEl.getAttribute('data-pawn-id'));
+
+      if (this.skillsInteraction) {
+        if (pIdx === this.currentPlayerIndex) {
+          this.executeSkillOnPawn(pId);
+        }
+        return;
+      }
+
       this.selectPawn(pIdx, pId);
     };
     boardGrid.onmouseover = (e) => {
       const pawnEl = e.target.closest('.pawn');
       if (!pawnEl) return;
+      if (this.skillsInteraction) return;
       if (this.gamePhase !== 'moving') return;
       const pIdx = parseInt(pawnEl.getAttribute('data-player-index'));
       if (pIdx !== this.currentPlayerIndex || this.getCurrentPlayer().isBot) return;
@@ -2255,6 +2709,11 @@ const GameState = {
     if (typeof adjustBoardScale === 'function') {
       adjustBoardScale();
     }
+
+    if (this.rules.skillsEnabled) {
+      this.updateSkillsUI();
+      this.highlightSkillTargetPawns();
+    }
   },
 
   createPawnElement(pawn, playerIdx, isGatti) {
@@ -2262,7 +2721,8 @@ const GameState = {
     // Track E: color-blind mode uses symbol class instead of color name
     const colorBlind = GameState.settings.colorBlind;
     const cbClass = colorBlind ? `cb-${pawn.color}` : '';
-    pEl.className = `pawn ${pawn.color} ${isGatti ? 'gatti' : ''} ${cbClass}`.trim();
+    const shieldClass = pawn.hasShield ? 'shielded' : '';
+    pEl.className = `pawn ${pawn.color} ${isGatti ? 'gatti' : ''} ${cbClass} ${shieldClass}`.trim();
     pEl.setAttribute('data-player-index', playerIdx);
     pEl.setAttribute('data-pawn-id', pawn.id);
     // Track E: aria label for screen readers
@@ -2275,6 +2735,13 @@ const GameState = {
     const inner = document.createElement('div');
     inner.className = 'pawn-inner';
     pEl.appendChild(inner);
+
+    if (pawn.hasShield) {
+      const shieldOverlay = document.createElement('span');
+      shieldOverlay.className = 'shield-icon-overlay';
+      shieldOverlay.textContent = '🛡️';
+      pEl.appendChild(shieldOverlay);
+    }
 
     // Track E: Color-blind symbol overlay
     if (colorBlind) {
@@ -2496,7 +2963,63 @@ const GameState = {
 
 // Global handlers to connect HTML to the JavaScript logic
 window.rollDice = function() {
-  GameState.rollCowries();
+  if (GameState.gamePhase === 'moving' && !GameState.hasAnyValidMoves() && GameState.rules.skillsEnabled) {
+    GameState.endTurn();
+  } else {
+    GameState.rollCowries();
+  }
+};
+
+window.useSkill = function(skillName) {
+  if (window.synth && typeof window.synth.playToggle === 'function') synth.playToggle();
+
+  const player = GameState.getCurrentPlayer();
+  if (!player || player.isBot) return;
+
+  if (skillName === 'reroll') {
+    const charges = player.skills?.charges ?? 0;
+    const hasUnusedRolls = GameState.displayRolls.length > 0 && GameState.displayRolls.every(r => !r.used);
+    if (charges < 1 || GameState.gamePhase !== 'moving' || !hasUnusedRolls) {
+      showToast('Cannot reroll right now!', 'warn');
+      return;
+    }
+
+    player.skills.charges -= 1;
+    GameState.rollQueue = [];
+    GameState.displayRolls = [];
+    GameState.consecutiveHighRolls = 0;
+    GameState.selectedRollIndex = null;
+    GameState.gamePhase = 'rolling';
+    
+    GameState.addLog(player.name, 'ne Reroll Kshamta ka upyog kiya (🎲)! Fir se fekein.');
+    showToast('Queue cleared! Roll again.', 'good');
+
+    GameState.renderBoard();
+    GameState.updateRollQueueUI();
+    GameState.saveGame();
+
+    if (GameState.settings.autoRoll) {
+      GameState.triggerAutoRoll();
+    }
+  } 
+  else if (skillName === 'shield') {
+    if (GameState.skillsInteraction === 'shield') {
+      GameState.skillsInteraction = null;
+    } else {
+      GameState.skillsInteraction = 'shield';
+      showToast('Select one of your board pawns to Shield (🛡️)', 'info');
+    }
+    GameState.renderBoard();
+  } 
+  else if (skillName === 'teleport') {
+    if (GameState.skillsInteraction === 'teleport') {
+      GameState.skillsInteraction = null;
+    } else {
+      GameState.skillsInteraction = 'teleport';
+      showToast('Select a pawn to Teleport to the next safe square (🌀)', 'info');
+    }
+    GameState.renderBoard();
+  }
 };
 
 window.toggleMute = function() {
@@ -2804,7 +3327,8 @@ window.startGame = function() {
   
   const rules = {
     gattiEnabled: document.getElementById('rule-gatti').classList.contains('active'),
-    spawnRequired: document.getElementById('rule-spawn')?.classList.contains('active') || false
+    spawnRequired: document.getElementById('rule-spawn')?.classList.contains('active') || false,
+    skillsEnabled: document.getElementById('rule-skills')?.classList.contains('active') || false
   };
 
   const playersList = [];
@@ -3034,10 +3558,14 @@ const ScreenEngine = {
     document.documentElement.style.setProperty('--vh', `${vHeight}px`);
 
     let boardSize = 0;
+    let bottomOffset = 145;
     
     if (vWidth <= 850) {
-      // Mobile: Reserve 310px for UI and Yards
-      boardSize = Math.min(vHeight - 310, vWidth * 0.92);
+      // Mobile: Reserve space for UI and Yards. Grow reservation if skills are active on board
+      const hasSkills = window.GameState && GameState.rules && GameState.rules.skillsEnabled && (GameState.gamePhase !== 'setup' && GameState.gamePhase !== 'ended');
+      const reserved = hasSkills ? 390 : 310;
+      bottomOffset = hasSkills ? 225 : 145;
+      boardSize = Math.min(vHeight - reserved, vWidth * 0.92);
     } else if (vWidth <= 1200) {
       // Tablet: Reserve 200px for UI and Yards
       boardSize = Math.min(vHeight - 200, vWidth * 0.9);
@@ -3048,5 +3576,6 @@ const ScreenEngine = {
 
     boardSize = Math.max(250, boardSize); // Minimum bound
     document.documentElement.style.setProperty('--dynamic-board-size', `${boardSize}px`);
+    document.documentElement.style.setProperty('--board-outer-bottom', `${bottomOffset}px`);
   }
 };
